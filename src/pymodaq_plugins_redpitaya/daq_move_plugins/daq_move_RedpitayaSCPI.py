@@ -50,7 +50,8 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
     is_multiaxes = True
     _axis_names: Union[List[str], Dict[str, int]] = ['amplitude', 'frequency']
     _controller_units: Union[str, List[str]] = ['V','Hz']
-    _epsilon: Union[float, List[float]] = 0.1  # Detailing 1mV and 1Hz #TODO replace this by a value that is correct depending on your controller
+    _epsilon: Union[float, List[float]] = [0.005,1] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
+    # _epsilon: Union[float, List[float]] = 0.1  # Detailing 1mV and 1Hz #TODO replace this by a value that is correct depending on your controller
     # TODO it could be a single float of a list of float (as much as the number of axes)
     data_actuator_type = DataActuatorType.DataActuator
 
@@ -181,7 +182,8 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         """
 
         if self.is_master:  # is needed when controller is master
-            self.controller = RedPitayaScpi(ip_address=plugin_config('ip_address')) #  arguments for instantiation!)
+            self.controller = RedPitayaScpi(ip_address=self.settings['ip_address']) #  arguments for instantiation!)
+            # self.controller = RedPitayaScpi(ip_address=plugin_config('ip_address')) #  arguments for instantiation!)
         else:
             self.controller = controller
 
@@ -232,4 +234,4 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
 
 
 if __name__ == '__main__':
-    main(__file__)
+    main(__file__, init=False)
