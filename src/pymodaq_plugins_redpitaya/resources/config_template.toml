@@ -1,11 +1,13 @@
-title = 'this is the configuration file of the redpitaya plugin'
+title = 'this is the configuration file of the redpitaya plugin !!!!!!'
 
-ip_address = '10.42.0.77'
+ip_address = '169.254.121.34'
 port = 5000
 
 [sampling]
 decimation = 8
 nsamples = 2000
+gain1 = 'HV'
+gain2 = 'HV'
 
 [trigger]
 source = 'CH1_PE'  # choose in ['DISABLED', 'NOW', 'CH1_PE', 'CH1_NE', 'CH2_PE', 'CH2_NE', 'EXT_PE', 'EXT_NE', 'AWG_PE', 'AWG_NE']
@@ -15,12 +17,12 @@ center_trigger = true
 [generator]
 gen_trigger = 'INT'
 enabling = false
-amplitude = 0.1 #in V # default 1
-frequency = 1000 # in Hz
+amplitude = 1 #in V # default 1
+frequency = 1000000 # in Hz
 shape = 'SINE'
 offset = 0 # in V
 phase = 0 # in degrees
-cycle = 0.5 # in %
+cycle = 0.5 # in fraction (1 = 100%)
 channel = 1
 
 [sweep]
