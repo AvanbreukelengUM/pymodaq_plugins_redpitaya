@@ -23,7 +23,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
        Python wrapper of a particular instrument.
 
        * Should be compatible with all redpitaya flavours using the SCPI communication protocol
-       * Tested with Red Pitaya 2.00-37 OS | STEMlab 125-14
+       * Tested with Red Pitaya 2.00-37 OS | STEMlab 125-14 Pro (Gen 2) version
        * PyMoDAQ >= 5.0.5
        * Tested with Linux Ubuntu 24.04.1 LTS
        * Installation instruction:
@@ -59,6 +59,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
                   'value': plugin_config('ip_address')},
                  {'title': 'Port:', 'name': 'port', 'type': 'int', 'value': plugin_config('port')},
                  {'title': 'Board name:', 'name': 'bname', 'type': 'str', 'readonly': True},
+
                  {'title': 'Channel', 'name': 'channel', 'type': 'list', 'limits':{'1': 1, '2': 2},
                   'value': plugin_config('generator', 'channel')},
 
@@ -130,7 +131,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
                 self.settings.child('bounds', 'max_bound').setValue(50e6)
             elif param.value == 'amplitude':
                 self.settings.child('bounds', 'min_bound').setValue(0)
-                self.settings.child('bounds', 'max_bound').setValue(1)
+                self.settings.child('bounds', 'max_bound').setValue(2)
 
             self.settings.child('bounds', 'is_bounds').value()
             self.settings.child('bounds', 'is_bounds').setValue(True)
@@ -156,6 +157,9 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             self.aout.sweep_state = param.value()
         elif param.name() == 'sweep_direction':
             self.aout.sweep_direction = param.value()
+        elif param.name() == 'gen_trigger':
+            self.aout.gen_trigger_source = param.value()
+            # TODO implement trigger source setting correctly
 
     def is_enabled(self) -> bool:
         "It defines if the supply voltage is enabled on the output channel chosen"
@@ -192,7 +196,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
         self.aout.enable = True
-        self.aout.run()
+        self.aout.run() # TODO change this function to work with other trigger sources than INTernal trigger
 
         info = "Whatever info you want to log"
         initialized = True
@@ -210,8 +214,11 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         value = self.check_bound(value)  #if user checked bounds, the defined bounds are applied here
         self.target_value = value
         value = self.set_position_with_scaling(value)  # apply scaling if the user specified one
-
-        setattr(self.controller.analog_out[self.settings['channel']], self.axis_name, value.value(self.axis_unit))
+        print("axis name: ",self.axis_name)
+        print("axis value: ",value)
+        setattr(self.aout, self.axis_name, value.value(self.axis_unit))
+        self.aout.run() # regenerates trigger, otherwise it will continue to generate on the passed settings
+        #  TODO change this function to work with other trigger sources than INTernal trigger
 
     def move_rel(self, value: DataActuator):
         """ Move the actuator to the relative target actuator value defined by value

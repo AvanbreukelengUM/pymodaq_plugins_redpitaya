@@ -18,7 +18,7 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
     Python wrapper of a particular instrument.
 
     * Should be compatible with all redpitaya flavour using the SCPI communication protocol
-    * Tested with the STEMlab 125-14 version
+    * Tested with the STEMlab 125-14 Pro (Gen 2) version
     * PyMoDAQ >= 4.1.0
 
     Attributes:
@@ -208,7 +208,7 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
                     size=nsamples)
         self.dte_signal.emit(DataToExport('Redpitaya_dte',
                                           data=[DataFromPlugins(name='RedPitaya', data=data_list,
-                                                                dim='Data1D', labels=['AI0', 'AI1'],
+                                                                dim='Data1D', labels=['IN1', 'IN2'],
                                                                 axes=[axis])]))
 
     def stop(self):
