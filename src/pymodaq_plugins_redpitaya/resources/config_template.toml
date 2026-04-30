@@ -1,35 +1,40 @@
-title = 'this is the configuration file of the redpitaya plugin !!!!!!'
-
-ip_address = '169.254.121.34'
+title = "this is the configuration file of the redpitaya plugin !!!!!!"
+ip_address = "169.254.121.34"
 port = 5000
 
 [sampling]
-decimation = 8
+decimation = 128
 nsamples = 2000
-gain1 = 'HV'
-gain2 = 'HV'
+gain1 = "HV"
+gain2 = "HV"
 
 [trigger]
-source = 'CH1_PE'  # choose in ['DISABLED', 'NOW', 'CH1_PE', 'CH1_NE', 'CH2_PE', 'CH2_NE', 'EXT_PE', 'EXT_NE', 'AWG_PE', 'AWG_NE']
+source = "CH1_PE"
 level = 0.0
 center_trigger = true
 
 [generator]
-gen_trigger = 'INT'
+gen_trigger = "INT"
 enabling = false
-amplitude = 1 #in V # default 1
-frequency = 1000000 # in Hz
-shape = 'SINE'
-offset = 0 # in V
-phase = 0 # in degrees
-cycle = 0.5 # in fraction (1 = 100%)
-channel = 1
+amplitude = 1
+frequency = 1000
+shape = "SINE"
+offset = 0
+phase = 0
+cycle = 0.5
+channel = 'x'
+piezo_channel = 'x'
+
+[Scaling]
+scaling = 50e-6
+use_scaling = true
+offset2 = 0
 
 [sweep]
-sweep_modes ='LINEAR'
+sweep_modes = "LINEAR"
 sweep_start_frequency = 10
-sweep_stop_frequency = 1e6
-sweep_time = 1e6
+sweep_stop_frequency = 1000000.0
+sweep_time = 1000000.0
 sweep_decimation = 64
 sweep_nsamples = 8000
-direction = 'NORMAL'
+direction = "NORMAL"

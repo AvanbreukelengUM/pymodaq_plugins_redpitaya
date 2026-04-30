@@ -48,9 +48,9 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
        """
 
     is_multiaxes = True
-    _axis_names: Union[List[str], Dict[str, int]] = ['amplitude', 'frequency']
-    _controller_units: Union[str, List[str]] = ['V','Hz']
-    _epsilon: Union[float, List[float]] = [0.005,1] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
+    _axis_names: Union[List[str], Dict[str, int]] = ['displacement', 'frequency','amplitude']
+    _controller_units: Union[str, List[str]] = ['m','Hz','V']
+    _epsilon: Union[float, List[float]] = [10e-9,1,0.005] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
     # _epsilon: Union[float, List[float]] = 0.1  # Detailing 1mV and 1Hz #TODO replace this by a value that is correct depending on your controller
     # TODO it could be a single float of a list of float (as much as the number of axes)
     data_actuator_type = DataActuatorType.DataActuator
@@ -59,6 +59,18 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
                   'value': plugin_config('ip_address')},
                  {'title': 'Port:', 'name': 'port', 'type': 'int', 'value': plugin_config('port')},
                  {'title': 'Board name:', 'name': 'bname', 'type': 'str', 'readonly': True},
+
+                 {'title': 'Conversion [nm/V]', 'name': 'conversion', 'type': 'float', 'limits': (-1e-4, 1e-4),
+                  'value': plugin_config('Scaling', 'scaling')},
+
+                 # {'title': 'Scaling', 'name': 'scaling', 'type': 'group', 'children': [
+                 #     {'title': 'FSM scaling [m/V]', 'name': 'scaling', 'type': 'float', 'limits': (-1e-4, 1e-4),
+                 #      'value': plugin_config('Scaling', 'scaling')},
+                 #     {'title': 'FSM offset [m/V]', 'name': 'offset', 'type': 'float', 'limits': (-1e-4, 1e-4),
+                 #      'value': plugin_config('Scaling', 'offset2')},
+                 #     {'title': 'Use Scaling', 'name': 'use_scaling', 'type': 'bool',
+                 #      'value': plugin_config('Scaling', 'use_scaling')},
+                 # ]},
 
                  {'title': 'Channel', 'name': 'channel', 'type': 'list', 'limits':{'1': 1, '2': 2},
                   'value': plugin_config('generator', 'channel')},
@@ -98,6 +110,8 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
 
     def ini_attributes(self):
         self.controller: RedPitayaScpi = None
+        # self.conv_factor = 50e-6
+        # self.scale = True
         pass
 
     def get_actuator_value(self):
@@ -107,10 +121,16 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         -------
         float: The position obtained after scaling conversion.
         """
-        pos = DataActuator(data=getattr(self.aout, self.axis_name),
-                           units=self.axis_unit)
-        pos = self.get_position_with_scaling(pos)
 
+        if self.axis_name == 'displacement':
+            pos = DataActuator(data=getattr(self.aout, 'amplitude'),
+                           units=self.axis_unit)
+            pos = self.get_position_with_scaling(pos)
+            pos = pos*self.settings['conversion']
+        else:
+            pos = DataActuator(data=getattr(self.aout, self.axis_name),
+                           units=self.axis_unit)
+            pos = self.get_position_with_scaling(pos)
         return pos
 
     def close(self):
@@ -132,6 +152,9 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             elif param.value == 'amplitude':
                 self.settings.child('bounds', 'min_bound').setValue(0)
                 self.settings.child('bounds', 'max_bound').setValue(2)
+            elif param.value == 'displacement':
+                self.settings.child('bounds', 'min_bound').setValue(-200e-6)
+                self.settings.child('bounds', 'max_bound').setValue(200e-6)
 
             self.settings.child('bounds', 'is_bounds').value()
             self.settings.child('bounds', 'is_bounds').setValue(True)
@@ -213,12 +236,14 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             self.aout.enable = True
         value = self.check_bound(value)  #if user checked bounds, the defined bounds are applied here
         self.target_value = value
-        value = self.set_position_with_scaling(value)  # apply scaling if the user specified one
-        print("axis name: ",self.axis_name)
-        print("axis value: ",value)
-        setattr(self.aout, self.axis_name, value.value(self.axis_unit))
+        value = self.set_position_with_scaling(value)  # TODO apply scaling if the user specified one
+        if self.axis_name == 'displacement':
+            value = value/self.settings['conversion']
+            setattr(self.aout, 'amplitude', value.value(self.axis_unit))
+        else:
+            setattr(self.aout, self.axis_name, value.value(self.axis_unit))
         self.aout.run() # regenerates trigger, otherwise it will continue to generate on the passed settings
-        #  TODO change this function to work with other trigger sources than INTernal trigger
+        #  TODO change this run command to work with other trigger sources than INTernal trigger
 
     def move_rel(self, value: DataActuator):
         """ Move the actuator to the relative target actuator value defined by value
