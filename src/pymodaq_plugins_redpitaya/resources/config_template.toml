@@ -18,11 +18,11 @@ gen_trigger = "INT"
 enabling = false
 amplitude = 1
 frequency = 1000
-shape = "SINE"
+shape = "DC"
 offset = 0
 phase = 0
 cycle = 0.5
-channel = 'x'
+channel = 1
 piezo_channel = 'x'
 
 [Scaling]
@@ -38,3 +38,13 @@ sweep_time = 1000000.0
 sweep_decimation = 64
 sweep_nsamples = 8000
 direction = "NORMAL"
+
+[counting]
+port_count = 5555
+threshold = 200 #200 is a good value for signals of +-1V
+deadtime = 0
+gate_ms = 10
+history = 1000
+stream_length = 25
+stream_ms = 20
+histogram = false
