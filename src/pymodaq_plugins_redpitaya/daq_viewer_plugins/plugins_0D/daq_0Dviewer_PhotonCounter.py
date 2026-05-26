@@ -148,6 +148,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
+
         # QThread.msleep(max((1, int(self.settings['counting', 'stream_ms']))))
         point = self.controller.read_stream()
         if point:
