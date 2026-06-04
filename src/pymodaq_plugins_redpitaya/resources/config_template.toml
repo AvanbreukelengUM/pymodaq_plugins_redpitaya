@@ -41,10 +41,11 @@ direction = "NORMAL"
 
 [counting]
 port_count = 5555
+port_count_1D = 5556
 threshold = 200 #200 is a good value for signals of +-1V
 deadtime = 0
 gate_ms = 10
 history = 1000
-stream_length = 25
+stream_length = 5
 stream_ms = 20
 histogram = false

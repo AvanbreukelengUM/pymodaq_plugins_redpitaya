@@ -1,3 +1,5 @@
+from time import perf_counter
+
 from qtpy.QtCore import QThread
 
 from pymodaq.utils.data import DataFromPlugins, Axis, DataToExport
@@ -54,24 +56,13 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
              'value': plugin_config('counting', 'deadtime')},
             {'title': 'Gate period (ms):', 'name': 'gate_ms', 'type': 'int',
              'value': plugin_config('counting', 'gate_ms')},
-            {'title': 'Plot length (s):', 'name': 'stream_length', 'type': 'int',
-             'value': plugin_config('counting', 'stream_length')},
-            {'title': 'Stream update (ms):', 'name': 'stream_ms', 'type': 'int',
-             'value': plugin_config('counting', 'stream_ms')},
-            {'title': 'Histogram:', 'name': 'histogram', 'type': 'bool',
-             'value': plugin_config('counting', 'histogram')},
         ]},
         ]
 
     def ini_attributes(self):
         self.controller: PhotonCounter = None
         self.x_axis: Axis = None
-        self.history = int(self.settings['counting', 'stream_length'] / self.settings['counting', 'gate_ms'] * 1000)
-        self.times = deque(maxlen=self.history)
-        self.rates = deque(maxlen=self.history)
-        self.t0 = time.time()
         self.cps = 0
-        self.start_time = time.time()
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
@@ -89,11 +80,14 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
             self.controller.set_deadtime(param.value())
             print(f"  Dead time: {param.value()} cycles ({param.value() * 8} ns)")
 
-
         elif param.name() == 'gate_ms':
             gate_cycles = int(param.value()*125_000)
             self.controller.set_gate_period(gate_cycles)
             print(f"  Gate period: {param.value()} ms ({gate_cycles} cycles)")
+            if 1/param.value()*1000 > self.cps:
+                print("WARNING: Gate period might be too short for the current count rate.")
+            if param.value()<10:
+                print("Attention: Gate period is lower than the PyMoDAQ update time.")
 
     def ini_detector(self, controller=None):
         """Detector communication initialization
@@ -123,8 +117,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
         self.controller.set_gate_period(gate_cycles)
         self.controller.enable()
-        self.controller.start_stream(self.settings['counting', 'stream_ms'])
-
+        # self.controller.start_stream(self.settings['counting', 'stream_ms'])
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
         initialized = True
@@ -132,7 +125,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
 
     def close(self):
         """Terminate the communication protocol"""
-        self.controller.stop_stream()
+        # self.controller.stop_stream()
         self.controller.disable()
         self.controller.close()
 
@@ -149,23 +142,17 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
             others optionals arguments
         """
 
-        # QThread.msleep(max((1, int(self.settings['counting', 'stream_ms']))))
-        point = self.controller.read_stream()
+        # print(time.perf_counter())
+
+        point = self.controller.get_rate()
         if point:
-            ts, total, gate_count, self.cps = point
-            t = ts - self.t0 if self.t0 else 0
-            self.times.append(t)
-            self.rates.append(self.cps)
-            # axis = Axis('time', units='s', offset=0,
-            #             scaling=1,
-            #             size=self.history)
+            self.cps = point.cps
         else:
             print("No data. Re-trying...")
 
         self.dte_signal.emit(DataToExport('PhotonCounter',
-                                              data=[DataFromPlugins(name='RedPitaya', data=self.cps,
+                                              data=[DataFromPlugins(name='RedPitaya', data=np.array([self.cps]),
                                                                 dim='Data0D', labels=['IN1'])]))
-
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
