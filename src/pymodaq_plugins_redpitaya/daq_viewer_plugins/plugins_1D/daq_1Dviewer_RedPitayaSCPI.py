@@ -1,7 +1,6 @@
 import numpy as np
 from qtpy import QtWidgets
 from qtpy.QtCore import QThread
-
 from pymodaq.utils.daq_utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins, Axis, DataToExport
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, comon_parameters, main
@@ -188,7 +187,7 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
             offset = 0
 
         self.controller.acquisition_start()
-        QThread.msleep(max((1, int(wait_time * 1000))))
+        # QThread.msleep(max((1, int(wait_time * 1000))))
         self.controller.acq_trigger_source = self.settings['triggering', 'trigger_source'] #doesn't make much sense to have it here but doesn't work if removed...
 
         while not self.controller.acq_trigger_status:
@@ -198,6 +197,13 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
         while not self.controller.acq_buffer_filled:
             QThread.msleep(10)
             QtWidgets.QApplication.processEvents()
+
+        # t00 = time.time()
+        # while True:
+        #     print(time.time()-t00)
+        #     t00 = time.time()
+        #     # trig_position = self.controller.acq_trigger_position
+        #     # data_list = [self.controller.analog_in[1].get_data_from(trig_position - offset, nsamples)]
 
         trig_position = self.controller.acq_trigger_position
 
