@@ -1,6 +1,7 @@
 title = "this is the configuration file of the redpitaya plugin !!!!!!"
 ip_address = "169.254.121.34"
 port = 5000
+gen_type= "RF fast"
 
 [sampling]
 decimation = 128
@@ -23,7 +24,11 @@ offset = 0
 phase = 0
 cycle = 0.5
 channel = 1
-piezo_channel = 'x'
+scaling = 50e-6
+
+[generator_slow]
+scaling = 16.66e-6
+chanel = 1
 
 [Scaling]
 scaling = 50e-6

@@ -15,7 +15,7 @@ from pymodaq_plugins_redpitaya.utils import Config
 
 plugin_config = Config()
 
-class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
+class DAQ_Move_RedpitayaAnalogSlow(DAQ_Move_base):
     """ Instrument plugin class for Red Pitaya
 
        This object inherits all functionalities to communicate with PyMoDAQ’s DAQ_Move module through
@@ -48,9 +48,9 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
        """
 
     is_multiaxes = True
-    _axis_names: Union[List[str], Dict[str, int]] = ['displacement', 'frequency','amplitude']
-    _controller_units: Union[str, List[str]] = ['m','Hz','V']
-    _epsilon: Union[float, List[float]] = [10e-9,1,0.005] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
+    _axis_names: Union[List[str], Dict[str, int]] = ['displacement', 'voltage']
+    _controller_units: Union[str, List[str]] = ['m','V']
+    _epsilon: Union[float, List[float]] = [1.7664e-6,0.128] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
     # _epsilon: Union[float, List[float]] = 0.1  # Detailing 1mV and 1Hz #TODO replace this by a value that is correct depending on your controller
     # TODO it could be a single float of a list of float (as much as the number of axes)
     data_actuator_type = DataActuatorType.DataActuator
@@ -61,55 +61,18 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
                  {'title': 'Board name:', 'name': 'bname', 'type': 'str', 'readonly': True},
 
                  {'title': 'Conversion [nm/V]', 'name': 'conversion', 'type': 'float', 'limits': (-1e-4, 1e-4),
-                  'value': plugin_config('Scaling', 'scaling')},
+                  'value': plugin_config('generator_slow', 'scaling')},
 
-                 # {'title': 'Scaling', 'name': 'scaling', 'type': 'group', 'children': [
-                 #     {'title': 'FSM scaling [m/V]', 'name': 'scaling', 'type': 'float', 'limits': (-1e-4, 1e-4),
-                 #      'value': plugin_config('Scaling', 'scaling')},
-                 #     {'title': 'FSM offset [m/V]', 'name': 'offset', 'type': 'float', 'limits': (-1e-4, 1e-4),
-                 #      'value': plugin_config('Scaling', 'offset2')},
-                 #     {'title': 'Use Scaling', 'name': 'use_scaling', 'type': 'bool',
-                 #      'value': plugin_config('Scaling', 'use_scaling')},
-                 # ]},
+                 {'title': 'Channel', 'name': 'channel', 'type': 'list', 'limits':{'0': 0, '1': 1, '2': 2, '3': 3},
+                  'value': plugin_config('generator_slow', 'channel')},
 
-                 {'title': 'Channel', 'name': 'channel', 'type': 'list', 'limits':{'1': 1, '2': 2},
-                  'value': plugin_config('generator', 'channel')},
-
-                 {'title': 'Gen Trigger:', 'name': 'gen_trigger', 'type': 'list',
-                  'limits': AnalogOutputFastChannel.GEN_TRIGGER_SOURCES, 'value': plugin_config('generator', 'gen_trigger'),
-                  'readonly': True},  #[Type]: "not working at the moment"},
-                 {'title': 'Enable', 'name': 'enable', 'type': 'bool', 'value': False },
-                {'title': 'Shape', 'name': 'shape', 'type': 'list',
-                      'limits': AnalogOutputFastChannel.SHAPES, 'value': plugin_config('generator', 'shape')},
-                 {'title': 'Offset', 'name': 'offset', 'type': 'float', 'limits' : AnalogOutputFastChannel.OFFSETS,
-                  'value': plugin_config('generator', 'offset')},
-                {'title': 'Phase', 'name': 'phase', 'type': 'float', 'limits' : AnalogOutputFastChannel.PHASES,
-                      'value': plugin_config('generator', 'phase')},
-                {'title': 'Dutycycle', 'name': 'dutycycle', 'type': 'float', 'limits' : AnalogOutputFastChannel.CYCLES,
-                      'value': plugin_config('generator', 'cycle')},
-
-                 {'title': 'Sweep', 'name': 'sweep_group', 'type': 'group', 'children': [
-                     {'title': 'Sweep Mode', 'name': 'sweep_mode', 'type': 'list', 'limits': AnalogOutputFastChannel.SWEEP_MODES,
-                      'value': plugin_config('sweep', 'sweep_modes')},
-                     {'title': 'Sweep Start Frequency', 'name': 'sweep_start_frequency', 'type': 'float',
-                      'limits': AnalogOutputFastChannel.FREQUENCIES,
-                      'value': plugin_config('sweep', 'sweep_start_frequency')},
-                     {'title': 'Sweep Stop Frequency', 'name': 'sweep_stop_frequency', 'type': 'float',
-                      'limits': AnalogOutputFastChannel.FREQUENCIES,
-                      'value': plugin_config('sweep', 'sweep_stop_frequency')},
-                     {'title': 'Sweep Time (µs)', 'name': 'sweep_time', 'type': 'int',
-                      'limits': [int(t) for t in AnalogOutputFastChannel.TIME],
-                      'value': plugin_config('sweep', 'sweep_time'), 'readonly': False},
-                     {'title': 'Sweep State', 'name': 'sweep_state', 'type': 'bool', 'value': False},
-                     {'title': 'Sweep Direction', 'name': 'sweep_direction', 'type': 'list', 'limits': AnalogOutputFastChannel.DIRECTION,
-                      'value': plugin_config('sweep', 'direction')},
-                 ]},
                 ] + comon_parameters_fun(is_multiaxes, axis_names=_axis_names, epsilon=_epsilon)
     # _epsilon is the initial default value for the epsilon parameter allowing pymodaq to know if the controller reached
     # the target value. It is the developer responsibility to put here a meaningful value
 
     def ini_attributes(self):
         self.controller: RedPitayaScpi = None
+        self.target_value = 0
         # self.conv_factor = 50e-6
         # self.scale = True
         pass
@@ -121,21 +84,13 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         -------
         float: The position obtained after scaling conversion.
         """
+        return  self.target_value
 
-        if self.axis_name == 'displacement':
-            pos = DataActuator(data=getattr(self.aout, 'amplitude'),
-                           units=self.axis_unit)
-            pos = self.get_position_with_scaling(pos)
-            pos = pos*self.settings['conversion']
-        else:
-            pos = DataActuator(data=getattr(self.aout, self.axis_name),
-                           units=self.axis_unit)
-            pos = self.get_position_with_scaling(pos)
-        return pos
 
     def close(self):
         """Terminate the communication protocol"""
-        self.aout.enable = False
+        self.aout_slow.reset()
+
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
@@ -146,52 +101,25 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             A given parameter (within detector_settings) whose value has been changed by the user
         """
         if param.name() == 'axis':
-            if param.value() =='frequency':
-                self.settings.child('bounds', 'min_bound').setValue(1e-6)
-                self.settings.child('bounds', 'max_bound').setValue(50e6)
-            elif param.value == 'amplitude':
+            if param.value == 'voltage':
                 self.settings.child('bounds', 'min_bound').setValue(0)
-                self.settings.child('bounds', 'max_bound').setValue(2)
+                self.settings.child('bounds', 'max_bound').setValue(1.8)
             elif param.value == 'displacement':
-                self.settings.child('bounds', 'min_bound').setValue(-200e-6)
-                self.settings.child('bounds', 'max_bound').setValue(200e-6)
+                self.settings.child('bounds', 'min_bound').setValue(0)
+                self.settings.child('bounds', 'max_bound').setValue(30e-6)
 
             self.settings.child('bounds', 'is_bounds').value()
             self.settings.child('bounds', 'is_bounds').setValue(True)
-        elif param.name() == 'enable':
-            self.aout.enable = param.value()
-        elif param.name() == 'shape':
-            self.aout.shape = param.value()
-        elif param.name() == 'offset':
-            self.aout.offset = param.value()
-        elif param.name() == 'phase':
-            self.aout.phase = param.value()
-        elif param.name() == 'dutycycle':
-            self.aout.dutycycle = param.value()
-        elif param.name() == 'sweep_mode':
-            self.aout.sweep_mode = param.value()
-        elif param.name() == 'sweep_start_frequency':
-            self.aout.sweep_start_frequency = param.value()
-        elif param.name() == 'sweep_stop_frequency':
-            self.aout.sweep_stop_frequency = param.value()
-        elif param.name() == 'sweep_time':
-            self.aout.sweep_time = int(param.value())
-        elif param.name() == 'sweep_state':
-            self.aout.sweep_state = param.value()
-        elif param.name() == 'sweep_direction':
-            self.aout.sweep_direction = param.value()
-        elif param.name() == 'gen_trigger':
-            self.aout.gen_trigger_source = param.value()
-            # TODO implement trigger source setting correctly
 
-    def is_enabled(self) -> bool:
-        "It defines if the supply voltage is enabled on the output channel chosen"
-        return self.settings['enable'] == True
+
+    # def is_enabled(self) -> bool:
+    #     "It defines if the supply voltage is enabled on the output channel chosen"
+    #     return self.settings['enable'] == True
 
     @property
-    def aout(self):
+    def aout_slow(self):
         """ It defines what output channel the user chose"""
-        return self.controller.analog_out[self.settings['channel']]
+        return self.controller.analog_out_slow[self.settings['channel']]
 
     def ini_stage(self, controller=None):
         """Actuator communication initialization
@@ -214,12 +142,9 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         else:
             self.controller = controller
 
-        self.aout.shape = self.settings['shape'] #plugin_config('generator', 'shape')
-
+        self.settings.child('bounds', 'is_bounds').setValue(True)
         self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
-        self.aout.enable = True
-        self.aout.run() # TODO change this function to work with other trigger sources than INTernal trigger
 
         info = "Whatever info you want to log"
         initialized = True
@@ -232,17 +157,17 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         ----------
         value: (float) value of the absolute target positioning
         """
-        if not self.is_enabled():
-            self.aout.enable = True
         value = self.check_bound(value)  #if user checked bounds, the defined bounds are applied here
         self.target_value = value
+        print(value)
         value = self.set_position_with_scaling(value)  # TODO apply scaling if the user specified one
         if self.axis_name == 'displacement':
             value = value/self.settings['conversion']
-            setattr(self.aout, 'amplitude', value.value(self.axis_unit))
+            print(value)
+            setattr(self.aout_slow, 'voltage', value.value(self.axis_unit))
         else:
-            setattr(self.aout, self.axis_name, value.value(self.axis_unit))
-        self.aout.run() # regenerates trigger, otherwise it will continue to generate on the passed settings
+            print(self.axis_unit)
+            setattr(self.aout_slow, self.axis_name, value.value(self.axis_unit))
         #  TODO change this run command to work with other trigger sources than INTernal trigger
 
     def move_rel(self, value: DataActuator):
