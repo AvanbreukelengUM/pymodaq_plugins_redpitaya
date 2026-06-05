@@ -28,6 +28,7 @@ Authors
 =======
 
 * Sebastien J. Weber  (sebastien.weber@cemes.fr)
+* Alejandro van Breukelen García (alejandro.vanbreukelen-garcia@umontpellier.fr)
 
 
 Instruments
