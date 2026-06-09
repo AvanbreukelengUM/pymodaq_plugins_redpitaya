@@ -14,11 +14,10 @@ from pymodaq_gui.parameter import Parameter
 
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, comon_parameters, main
 from pymodaq.utils.data import DataFromPlugins
-from pymodaq_plugins_redpitaya.hardware.redpitaya_scpi import RedPitayaScpi, AnalogOutputFastChannel
+from pymeasure.instruments.redpitaya.redpitaya_scpi import RedPitayaScpi, AnalogOutputFastChannel
+from pymodaq_plugins_redpitaya.hardware.photon_client_scanner import PhotonScanner
 
-from pymodaq_plugins_redpitaya.hardware.photon_client_1D import PhotonCounter
-
-class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
+class DAQ_1DViewer_Scan(DAQ_Viewer_base):
     """ Instrument plugin class for a 1D viewer.
     
     This object inherits all functionalities to communicate with PyMoDAQ’s DAQ_Viewer module through
@@ -46,35 +45,39 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
 
         {'title': 'Counting:', 'name': 'counting', 'type': 'group', 'children': [
             {'title': 'Port:', 'name': 'port_count', 'type': 'int',
-              'value': plugin_config('counting', 'port_count_1D')},
+              'value': plugin_config('counting', 'port_scan')},
             {'title': 'Threshold (ADC units):', 'name': 'threshold', 'type': 'int',
              'value': plugin_config('counting', 'threshold')},
             {'title': 'Deadtime (clock cycles, 1=8ns):', 'name': 'deadtime', 'type': 'int',
              'value': plugin_config('counting', 'deadtime')},
             {'title': 'Gate period (ms):', 'name': 'gate_ms', 'type': 'int',
              'value': plugin_config('counting', 'gate_ms')},
-            {'title': 'Stream update (ms):', 'name': 'stream_ms', 'type': 'int',
-             'value': plugin_config('counting', 'stream_ms')},
+            # {'title': 'Stream update (ms):', 'name': 'stream_ms', 'type': 'int',
+            #  'value': plugin_config('counting', 'stream_ms')},
+            # {'title': 'Histogram:', 'name': 'histogram', 'type': 'bool',
+            #  'value': plugin_config('counting', 'histogram')},
+        ]},
+        {'title': 'Scanning:', 'name': 'scan', 'type': 'group', 'children': [
             {'title': 'Resolution (number of pixels):', 'name': 'res', 'type': 'int',
-             'value': plugin_config('counting', 'res')},
-            {'title': 'Start (μs)', 'name': 'start', 'type': 'float',
-             'value': plugin_config('counting', 'start')},
-            {'title': 'Stop (μs)', 'name': 'stop', 'type': 'float',
-             'value': plugin_config('counting', 'stop')},
-            {'title': 'Converstion factor (μm/V)', 'name': 'conv_factor', 'type': 'float',
-             'value': plugin_config('counting', 'conv_factor')}
-            {'title': 'Histogram:', 'name': 'histogram', 'type': 'bool',
-             'value': plugin_config('counting', 'histogram')},
+             'value': plugin_config('scan', 'res')},
+            {'title': 'Start (μm)', 'name': 'start', 'type': 'float',
+             'value': plugin_config('scan', 'start')},
+            {'title': 'Stop (μm)', 'name': 'stop', 'type': 'float',
+             'value': plugin_config('scan', 'stop')},
+            {'title': 'Stop (μm)', 'name': 'stop', 'type': 'float',
+             'value': plugin_config('scan', 'stop')},
+            {'title': 'Shape', 'name': 'shape', 'type': 'list',
+             'limits': AnalogOutputFastChannel.SHAPES, 'value': plugin_config('scan', 'shape')},
         ]},
         ]
 
     def ini_attributes(self):
-        self.controller: PhotonCounter = None
+        self.controller: PhotonScanner = None
         self.mover: RedPitayaScpi = None
         self.x_axis: Axis = None
-        self.history = int(self.settings['counting', 'stream_ms'] / self.settings['counting', 'gate_ms'])
-        self.times = deque(maxlen=self.history)
-        self.rates = deque(maxlen=self.history)
+        # self.history = int(self.settings['counting', 'stream_ms'] / self.settings['counting', 'gate_ms'])
+        # self.times = deque(maxlen=self.settings['counting', 'deadtime'])
+        # self.rates = deque(maxlen=self.history)
         # self.t0 = time.time()
         self.t0 =1777990705
         self.cps = 0
@@ -108,22 +111,23 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
             if param.value() < 10:
                 print("Attention: Gate period is lower than the PyMoDAQ update time.")
 
-        elif param.name() == 'stream_ms':
-            self.controller.stop_stream()
-            self.history = int(param.value()/self.settings['counting', 'gate_ms'])
-            self.times = deque(maxlen=self.history)
-            self.rates = deque(maxlen=self.history)
-            print(self.history)
-            self.controller.start_stream1D(param.value())
-            print(f"  Restarted stream: {param.value()} ms")
+        # elif param.name() == 'stream_ms':
+        #     self.controller.stop_stream()
+        #     self.history = int(param.value()/self.settings['counting', 'gate_ms'])
+        #     self.times = deque(maxlen=self.history)
+        #     self.rates = deque(maxlen=self.history)
+        #     print(self.history)
+        #     self.controller.start_stream1D(param.value())
+        #     print(f"  Restarted stream: {param.value()} ms")
 
         elif param.name() == 'res':
             self.controller.set_pixels(param.value())
 
-        elif param.name() == 'start':
-            self.mover.
+        # elif param.name() == 'start':
+        #     self.mover.
 
         elif param.name() == 'stop':
+            setattr(self.aout, 'amplitude', param.value())
 
 
     def ini_detector(self, controller=None):
@@ -143,7 +147,7 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
         """
 
         self.ini_detector_init(old_controller=controller,
-                               new_controller=PhotonCounter(host=self.settings['ip_address'],
+                               new_controller=PhotonScanner(host=self.settings['ip_address'],
                                                             port=self.settings['counting','port_count']))
         bname = self.controller.name
         self.settings.child('bname').setValue(bname)
@@ -165,6 +169,11 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
         self.controller.stop_stream()
         self.controller.disable()
         self.controller.close()
+        self.aout.enable = False
+
+    def aout(self):
+        """ It defines what output channel the user chose"""
+        return self.mover.analog_out[1]
 
     def grab_data(self, Naverage=1, **kwargs):
 
