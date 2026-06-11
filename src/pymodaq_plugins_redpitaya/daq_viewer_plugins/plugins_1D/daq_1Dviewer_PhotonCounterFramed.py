@@ -17,7 +17,8 @@ from pymodaq.utils.data import DataFromPlugins
 
 # from pymeasure.instruments.redpitaya.redpitaya_scpi import RedPitayaScpi, AnalogInputFastChannel
 
-from pymodaq_plugins_redpitaya.hardware.photon_client_1D import PhotonCounter
+# from pymodaq_plugins_redpitaya.hardware.photon_client_1D import PhotonCounter
+from pymodaq_plugins_redpitaya.hardware.photon_client_scanner_claude import PhotonCounter
 
 class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
     """ Instrument plugin class for a 1D viewer.
@@ -108,7 +109,7 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
             self.times = deque(maxlen=self.history)
             self.rates = deque(maxlen=self.history)
             print(self.history)
-            self.controller.start_stream1D(param.value())
+            self.controller.start_stream_gated(param.value())
             print(f"  Restarted stream: {param.value()} ms")
 
 
@@ -140,7 +141,7 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
         gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
         self.controller.set_gate_period(gate_cycles)
         self.controller.enable()
-        self.controller.start_stream1D(self.settings['counting', 'stream_ms'])
+        self.controller.start_stream_gated(self.settings['counting', 'stream_ms'])
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
         initialized = True
@@ -165,7 +166,8 @@ class DAQ_1DViewer_PhotonCounterFramed(DAQ_Viewer_base):
             others optionals arguments
         """
         # QThread.msleep(max((1, int(self.settings['counting', 'stream_ms']))))
-        points = self.controller.read_stream1D()
+        points = self.controller.read_stream_gated()
+        print(points)
         if points:
             for point in points:
                 ts, total, gate_count, self.cps = point

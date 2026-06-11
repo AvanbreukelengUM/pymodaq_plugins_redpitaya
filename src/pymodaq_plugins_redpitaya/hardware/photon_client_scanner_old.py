@@ -26,20 +26,9 @@ class TrigStatus:
 # =========================================================
 
 class PhotonScanner:
-    """Client for the Red Pitaya photon counter server.
+    """Client for the Red Pitaya photon counter server."""
 
-    Nomenclature preservée — toutes les méthodes publiques gardent leur nom d'origine.
-    Corrections de compatibilité avec photon_server_scanner.py :
-      - start_stream1D  → envoie STREAM_GATED  (serveur ne connaît pas STREAM1D)
-      - start_stream_trig(timeout_s)  → paramètre renommé en timeout_s (serveur attend des secondes)
-      - read_stream1D   → parse la réponse STREAM_GATED du serveur
-      - read_stream_trig → parse la réponse STREAM_TRIG du serveur (était STREAM1D par erreur)
-      - set_trig_arm(arm=True)  → envoie SET_TRIG_ARM (arme); arm=False → envoie STOP (désarme)
-      - set_hist_shift ajouté (commande SET_HIST_SHIFT présente côté serveur)
-    """
-
-    def __init__(self, host: str = '169.254.121.34', port: int = 5555,
-                 timeout: float = 5.0, name: str = "Redpitaya_PhotonCounter"):
+    def __init__(self, host: str = '169.254.121.34', port: int = 5555, timeout: float = 5.0, name="Redpitaya_PhotonCounter"):
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -62,6 +51,7 @@ class PhotonScanner:
                 self._buf += data
             except socket.timeout:
                 return None
+
         line, self._buf = self._buf.split("\n", 1)
         return line.strip()
 
@@ -76,14 +66,9 @@ class PhotonScanner:
     # BASIC CONTROL
     # =========================================================
 
-    def enable(self):
-        self._send("ENABLE")
-
-    def disable(self):
-        self._send("DISABLE")
-
-    def reset(self):
-        self._send("RESET")
+    def enable(self): self._send("ENABLE")
+    def disable(self): self._send("DISABLE")
+    def reset(self): self._send("RESET")
 
     def set_threshold(self, value: int):
         self._send(f"SET_THRESHOLD {value}")
@@ -94,10 +79,6 @@ class PhotonScanner:
     def set_gate_period(self, cycles: int):
         self._send(f"SET_GATE {cycles}")
 
-    def set_hist_shift(self, shift: int):
-        """Histogram bin shift (0–10). Ajouté pour correspondre à SET_HIST_SHIFT serveur."""
-        self._send(f"SET_HIST_SHIFT {shift}")
-
     # =========================================================
     # READOUT
     # =========================================================
@@ -107,7 +88,6 @@ class PhotonScanner:
 
     def get_rate(self) -> CountRate:
         resp = self._send("GET_RATE")
-        # Serveur renvoie: "<raw_counts> <cps>"
         raw, cps = resp.split()
         return CountRate(int(raw), float(cps))
 
@@ -119,7 +99,6 @@ class PhotonScanner:
 
     def get_status(self) -> dict:
         resp = self._send("GET_STATUS")
-        # Serveur renvoie: "enabled=<v> overflow=<v> count=<v> rate=<v>"
         return {
             k: int(v)
             for k, v in (p.split("=") for p in resp.split())
@@ -127,7 +106,6 @@ class PhotonScanner:
 
     def get_config(self) -> dict:
         resp = self._send("GET_CONFIG")
-        # Serveur renvoie: "enabled=<v> threshold=<v> deadtime=<v> gate_period=<v> hist_shift=<v>"
         return {
             k: int(v)
             for k, v in (p.split("=") for p in resp.split())
@@ -141,27 +119,13 @@ class PhotonScanner:
     # =========================================================
 
     def start_stream(self, interval_ms: int = 500):
-        """Flux continu de count_rate.
-        Commande serveur : STREAM <interval_ms>
-        Réponse serveur  : STREAM <ts> <cum_count> <gate_count> <cps>
-        """
         self._send(f"STREAM {interval_ms}")
 
     def start_stream1D(self, interval_ms: int = 500):
-        """Flux de comptage gate-par-gate (mode libre, sans trigger).
-        Nomenclature conservée — envoie STREAM_GATED au serveur
-        (le serveur ne connaît pas STREAM1D).
-        Réponse serveur : STREAM_GATED <ts> <gate_index> <gate_count> <cps>
-        """
-        self._send(f"STREAM_GATED {interval_ms}")
+        self._send(f"STREAM1D {interval_ms}")
 
-    def start_stream_trig(self, timeout_s: float = 10.0):
-        """Arme le trigger et attend la fin de l'acquisition.
-        Nomenclature conservée — le paramètre est maintenant timeout_s (secondes)
-        car le serveur attend un timeout et non un intervalle en ms.
-        Réponse serveur : STREAM_TRIG <ts> <c0> <c1> ... <cN-1>
-        """
-        self._send(f"STREAM_TRIG {timeout_s}")
+    def start_stream_trig(self, interval_ms: int = 500):
+        self._send(f"STREAM_TRIG {interval_ms}")
 
     def stop_stream(self):
         self.sock.sendall(b"STOP\n")
@@ -170,52 +134,48 @@ class PhotonScanner:
     # ---------------- STREAM PARSERS ----------------
 
     def read_stream(self) -> Optional[Tuple[float, int, int, float]]:
-        """Parse une ligne STREAM.
-        Retourne (timestamp, cum_count, gate_count, cps) ou None.
-        """
         line = self._recv_line()
         if not line:
             return None
+
         parts = line.split()
         if parts[0] != "STREAM":
             return None
+
         return (float(parts[1]), int(parts[2]), int(parts[3]), float(parts[4]))
 
     def read_stream1D(self) -> Optional[List[Tuple[float, int, int, float]]]:
-        """Parse une ligne STREAM_GATED (émise par start_stream1D).
-        Nomenclature conservée — parse la réponse STREAM_GATED du serveur.
-        Retourne une liste d'un seul élément : [(timestamp, gate_index, gate_count, cps)]
-        pour conserver la compatibilité avec le code appelant qui itère sur la liste.
-        """
         line = self._recv_line()
         if not line:
-            return None
-        parts = line.split()
-        # Serveur émet: STREAM_GATED <ts> <gate_index> <gate_count> <cps>
-        if parts[0] != "STREAM_GATED":
-            return None
-        try:
-            return [(float(parts[1]), int(parts[2]), int(parts[3]), float(parts[4]))]
-        except (IndexError, ValueError):
             return None
 
+        parts = line.split()
+        if parts[0] != "STREAM1D":
+            return None
+
+        out = []
+        for item in parts[1:]:
+            try:
+                t, c, r, cps = item.split(",")
+                out.append((float(t), int(c), int(r), float(cps)))
+            except ValueError:
+                continue
+        return out
+
     def read_stream_trig(self) -> Optional[Tuple[float, List[int]]]:
-        """Parse une ligne STREAM_TRIG (émise par start_stream_trig).
-        Retourne (timestamp, [c0, c1, ..., cN-1]) ou None.
-        Correction : parse STREAM_TRIG (était STREAM1D par erreur dans la v1).
-        """
         line = self._recv_line()
         if not line:
             return None
+
         parts = line.split()
-        # Serveur émet: STREAM_TRIG <ts> <c0> <c1> ... <cN-1>
-        if parts[0] != "STREAM_TRIG":
+        if parts[0] != "STREAM1D":
             return None
+
         try:
             ts = float(parts[1])
             counts = [int(x) for x in parts[2:]]
             return ts, counts
-        except (IndexError, ValueError):
+        except ValueError:
             return None
 
     # =========================================================
@@ -225,16 +185,8 @@ class PhotonScanner:
     def set_trig_enable(self, enable: bool):
         self._send(f"SET_TRIG_ENABLE {int(enable)}")
 
-    def set_trig_arm(self, arm: bool = True):
-        """Arme (arm=True) ou désarme (arm=False) le trigger.
-        Le serveur n'a pas de commande de désarmement explicite via SET_TRIG_ARM :
-          - arm=True  → SET_TRIG_ARM  (génère le front montant sur FPGA)
-          - arm=False → STOP          (arrête le stream et désarme côté serveur)
-        """
-        if arm:
-            self._send("SET_TRIG_ARM")
-        else:
-            self.stop_stream()
+    def set_trig_arm(self, arm: bool):
+        self._send(f"SET_TRIG_ARM {int(arm)}")
 
     def set_trig_total_gates(self, num: int):
         if not (1 <= num <= 1024):
@@ -242,12 +194,10 @@ class PhotonScanner:
         self._send(f"SET_TRIG_TOTAL_GATES {num}")
 
     def set_pixels(self, num: int):
-        """Alias de set_trig_total_gates — nomenclature conservée."""
         self.set_trig_total_gates(num)
 
     def get_trig_status(self) -> TrigStatus:
         resp = self._send("GET_TRIG_STATUS")
-        # Serveur renvoie: "trig_active=<v> trig_done=<v>"
         parts = dict(p.split("=") for p in resp.split())
         return TrigStatus(
             trig_active=bool(int(parts["trig_active"])),
@@ -262,7 +212,6 @@ class PhotonScanner:
 
     def get_trig_config(self) -> dict:
         resp = self._send("GET_TRIG_CONFIG")
-        # Serveur renvoie: "trig_enable=<v> trig_arm=<v> trig_total_gates=<v>"
         return {
             k: int(v)
             for k, v in (p.split("=") for p in resp.split())

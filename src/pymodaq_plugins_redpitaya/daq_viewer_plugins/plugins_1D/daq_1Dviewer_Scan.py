@@ -15,7 +15,8 @@ from pymodaq_gui.parameter import Parameter
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, comon_parameters, main
 from pymodaq.utils.data import DataFromPlugins
 from pymeasure.instruments.redpitaya.redpitaya_scpi import RedPitayaScpi, AnalogOutputFastChannel
-from pymodaq_plugins_redpitaya.hardware.photon_client_scanner import PhotonScanner
+# from pymodaq_plugins_redpitaya.hardware.photon_client_scanner import PhotonScanner
+from pymodaq_plugins_redpitaya.hardware.photon_client_scanner_original import PhotonScanner
 
 class DAQ_1DViewer_Scan(DAQ_Viewer_base):
     """ Instrument plugin class for a 1D viewer.
@@ -45,7 +46,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         {'title': 'Counting:', 'name': 'counting', 'type': 'group', 'children': [
             {'title': 'Port:', 'name': 'port_count', 'type': 'int',
-              'value': plugin_config('counting', 'port_scan')},
+              'value': plugin_config('scan', 'port_scan')},
             {'title': 'Threshold (ADC units):', 'name': 'threshold', 'type': 'int',
              'value': plugin_config('counting', 'threshold')},
             {'title': 'Deadtime (clock cycles, 1=8ns):', 'name': 'deadtime', 'type': 'int',
@@ -64,10 +65,10 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
              'value': plugin_config('scan', 'start')},
             {'title': 'Stop (μm)', 'name': 'stop', 'type': 'float',
              'value': plugin_config('scan', 'stop')},
-            {'title': 'Stop (μm)', 'name': 'stop', 'type': 'float',
-             'value': plugin_config('scan', 'stop')},
-            {'title': 'Shape', 'name': 'shape', 'type': 'list',
-             'limits': AnalogOutputFastChannel.SHAPES, 'value': plugin_config('scan', 'shape')},
+            # {'title': 'Shape', 'name': 'shape', 'type': 'list',
+            #  'limits': AnalogOutputFastChannel.SHAPES, 'value': plugin_config('scan', 'shape')},
+            {'title': 'Conversion [μm/V]', 'name': 'conversion', 'type': 'float', 'limits': (-1e-4, 1e3),
+             'value': plugin_config('Scaling', 'scaling')},
         ]},
         ]
 
@@ -79,8 +80,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         # self.times = deque(maxlen=self.settings['counting', 'deadtime'])
         # self.rates = deque(maxlen=self.history)
         # self.t0 = time.time()
-        self.t0 =1777990705
-        self.cps = 0
+        # self.t0 =1777990705
+        # self.cps = 0
 
 
     def commit_settings(self, param: Parameter):
@@ -103,13 +104,14 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             gate_cycles = int(param.value()*125_000)
             self.controller.set_gate_period(gate_cycles)
             print(f"  Gate period: {param.value()} ms ({gate_cycles} cycles)")
-            self.history = int(self.settings['counting', 'stream_ms'] / param.value())
-            self.times = deque(maxlen=self.history)
-            self.rates = deque(maxlen=self.history)
-            if 1 / param.value() * 1000 > self.cps:
+            # self.history = int(self.settings['counting', 'stream_ms'] / param.value())
+            # self.times = deque(maxlen=self.history)
+            # self.rates = deque(maxlen=self.history)
+            if 1 / param.value() * 1000 > self.gated_counts[0]:
                 print("WARNING: Gate period might be too short for the current count rate.")
-            if param.value() < 10:
+            if param.value()*self.settings['scan', 'res'] < 10:
                 print("Attention: Gate period is lower than the PyMoDAQ update time.")
+            self.mover.analog_out[1].frequency = 1000 / param.value()/self.settings['scan', 'res']
 
         # elif param.name() == 'stream_ms':
         #     self.controller.stop_stream()
@@ -122,13 +124,43 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         elif param.name() == 'res':
             self.controller.set_pixels(param.value())
+            self.mover.analog_out[1].frequency = 1000 / param.value()/ self.settings[
+                'counting', 'gate_ms']
 
-        # elif param.name() == 'start':
-        #     self.mover.
+
+        elif param.name() == 'start':
+            stop = self.settings['scan', 'stop']/self.settings['scan', 'conversion']-2
+            start = param.value()/self.settings['scan', 'conversion']-2
+            # amp = (stop-start)/2
+            # offset = (stop+start)/2
+            # setattr(self.mover.analog_out[1], 'amplitude', amp)
+            # setattr(self.mover.analog_out[1], 'offset', offset)
+            self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
+
 
         elif param.name() == 'stop':
-            setattr(self.aout, 'amplitude', param.value())
+            start = self.settings['scan', 'start'] / self.settings['scan', 'conversion']-2
+            stop = param.value() / self.settings['scan', 'conversion']-2
+            # amp = (stop - start) / 2
+            # offset = (stop + start) / 2
+            # setattr(self.mover.analog_out[1], 'amplitude', amp)
+            # setattr(self.mover.analog_out[1], 'offset', offset)
+            self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
 
+
+        elif param.name() == 'conversion':
+            start = self.settings['scan', 'start'] / param.value()-2
+            stop = self.settings['scan', 'stop'] / param.value()-2
+            # amp = (stop - start) / 2
+            # offset = (stop + start) / 2
+            # setattr(self.mover.analog_out[1], 'amplitude', amp)
+            # setattr(self.mover.analog_out[1], 'offset', offset)
+            self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
+
+    @property
+    def aout(self):
+        """ It defines what output channel the user chose"""
+        return self.mover.analog_out[1]
 
     def ini_detector(self, controller=None):
         """Detector communication initialization
@@ -149,6 +181,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.ini_detector_init(old_controller=controller,
                                new_controller=PhotonScanner(host=self.settings['ip_address'],
                                                             port=self.settings['counting','port_count']))
+        self.mover = RedPitayaScpi(ip_address=self.settings['ip_address'],port=self.settings['port'])
         bname = self.controller.name
         self.settings.child('bname').setValue(bname)
 
@@ -157,8 +190,44 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.controller.set_deadtime(self.settings['counting', 'deadtime'])
         gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
         self.controller.set_gate_period(gate_cycles)
+
+        self.mover.output_reset()
+        self.mover.analog_out[1].shape = "ARBITRARY"  # plugin_config('generator', 'shape')
+        # self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
+        self.mover.analog_out[1].burst_mode = "BURST"
+        self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion']-2
+        self.stop = self.settings['scan', 'stop'] / self.settings['scan', 'conversion']-2
+        # amp = (stop - start) / 2
+        # offset = (stop + start) / 2
+        # start = -1
+        # stop = 1
+        x = np.linspace(self.start,self.stop,16384)
+        waveform = []
+        for n in x:
+            waveform.append(f"{n:.5f}")
+        waveform1 = ", ".join(map(str,waveform))
+        # print(type(waveform1))
+        self.mover.analog_out[1].waveform_data = waveform1
+        print(self.mover.analog_out[1].waveform_data)
+        self.mover.analog_out[1].frequency = 1000/self.settings['scan', 'res']/self.settings['counting', 'gate_ms']
+        # self.mover.analog_out[1].amplitude = amp
+        self.mover.analog_out[1].offset = 0
+        self.mover.analog_out[1].burst_initial_voltage = self.start
+        self.mover.analog_out[1].burst_last_voltage = self.stop
+        # print(start)
+        # print(stop)
+        # print(self.mover.analog_out[1].burst_initial_voltage)
+        # print(self.mover.analog_out[1].burst_last_voltage)
+        self.mover.analog_out[1].burst_num_cycles = 1
+        self.mover.analog_out[1].burst_num_repetitions = 1
+        self.mover.analog_out[1].enable = True
+
         self.controller.enable()
-        self.controller.start_stream1D(self.settings['counting', 'stream_ms'])
+        self.controller.set_pixels(self.settings['scan', 'res'])
+        self.gated_counts = np.zeros(self.settings['scan', 'res'])
+        self.controller.set_trig_enable(True)
+        self.controller.set_trig_arm(True)
+        self.controller.start_stream_trig(int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
         initialized = True
@@ -169,11 +238,10 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.controller.stop_stream()
         self.controller.disable()
         self.controller.close()
-        self.aout.enable = False
+        self.mover.output_reset()
+        self.mover.analog_out[1].enable = False
 
-    def aout(self):
-        """ It defines what output channel the user chose"""
-        return self.mover.analog_out[1]
+
 
     def grab_data(self, Naverage=1, **kwargs):
 
@@ -188,30 +256,40 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             others optionals arguments
         """
         # QThread.msleep(max((1, int(self.settings['counting', 'stream_ms']))))
-        points = self.controller.read_stream1D()
-        if points:
-            for point in points:
-                ts, total, gate_count, self.cps = point
-                # t = ts - self.t0 if self.t0 else 0
-                self.times.append(ts)
-                self.rates.append(self.cps)
+        self.mover.analog_out[1].burst_initial_voltage = self.start
+        self.mover.analog_out[1].burst_last_voltage = self.stop
+        self.controller.set_trig_enable(True)
+        self.controller.set_trig_arm(True)
+        self.mover.analog_out[1].run()
+        # self.mover.analog_out[1].run()
+        # QThread.msleep(max((1, int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))))
 
+        points = self.controller.read_stream_trig()
+        print(points)
+        if points:
+            ts, self.gated_counts = points
+            # t = ts - self.t0 if self.t0 else 0
+            # self.times.append(ts)
+            # self.rates.append(self.cps)
         else:
             print("No data. Re-trying...")
 
-        scaling =   (self.times[-1]-self.times[0])/(np.size(self.rates))
+        scaling = self.settings['counting', 'gate_ms']/1000
 
         axis = Axis('time', units='s', offset=0,
                     scaling=scaling,
-                    size=np.size(self.rates))
+                    size=np.size(self.gated_counts))
         self.dte_signal.emit(DataToExport('PhotonCounter',
-                                              data=[DataFromPlugins(name='RedPitaya', data=[np.array(self.rates)],
+                                              data=[DataFromPlugins(name='RedPitaya', data=[self.gated_counts],
                                                                 dim='Data1D', labels=['IN1'],
                                                                     axes=[axis])]))
 
+        self.controller.set_trig_enable(False)
+        self.controller.set_trig_arm(False)
+
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        # self.controller.stop_stream()
+        self.controller.stop_stream()
         return ''
 
 
