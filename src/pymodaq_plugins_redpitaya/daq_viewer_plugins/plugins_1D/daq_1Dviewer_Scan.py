@@ -156,7 +156,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.controller.reset()
         self.controller.set_threshold(self.settings['counting', 'threshold'])
         self.controller.set_deadtime(self.settings['counting', 'deadtime'])
-        gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
+        gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000_000)
         self.controller.set_gate_period(gate_cycles)
 
         self.mover.output_reset()
