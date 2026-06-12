@@ -184,7 +184,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.gated_counts = np.zeros(self.settings['scan', 'res'])
         self.controller.set_trig_enable(True)
         self.controller.set_trig_arm(True)
-        self.controller.start_stream_trig(int(self.settings['counting', 'gate_ms'] * self.settings['scan', 'res']))
+        # self.controller.start_stream_trig(int(self.settings['counting', 'gate_ms'] * self.settings['scan', 'res']))
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
         initialized = True
@@ -217,11 +217,18 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.mover.analog_out[1].burst_last_voltage = self.stop
         self.controller.set_trig_enable(True)
         self.controller.set_trig_arm(True)
-        self.mover.analog_out[1].run()
-        # QThread.msleep(max((1, int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))))
+        # self.mover.analog_out[1].run()
+        QThread.msleep(max((5000, int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))))
 
-        points = self.controller.read_stream_trig()
-        print(points)
+        self.mover.analog_out[1].run()
+        # points = self.controller.read_stream_trig()
+        QThread.msleep(max((5000, int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))))
+        points = None
+        # print(points)
+        print(self.controller.get_trig_status())
+        print(self.controller.get_status())
+        print(self.controller.get_trig_counts())
+        # print(self.controller.get_trig_count(1))
         if points:
             ts, self.gated_counts = points
             self.controller.set_trig_arm(False)
@@ -245,4 +252,4 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
 
 if __name__ == '__main__':
-    main(__file__, init=False)
+    main(__file__, init=True)

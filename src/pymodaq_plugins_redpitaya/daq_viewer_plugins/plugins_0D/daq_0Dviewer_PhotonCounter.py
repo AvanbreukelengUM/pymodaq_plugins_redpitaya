@@ -19,7 +19,7 @@ from pymodaq.utils.data import DataFromPlugins
 
 # from pymeasure.instruments.redpitaya.redpitaya_scpi import RedPitayaScpi, AnalogInputFastChannel
 
-from pymodaq_plugins_redpitaya.hardware.photon_client import PhotonCounter
+from pymodaq_plugins_redpitaya.hardware.photon_client_scanner import PhotonScanner
 
 class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
     """ Instrument plugin class for a 1D viewer.
@@ -60,7 +60,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         ]
 
     def ini_attributes(self):
-        self.controller: PhotonCounter = None
+        self.controller: PhotonScanner = None
         self.x_axis: Axis = None
         self.cps = 0
 
@@ -106,12 +106,13 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         """
 
         self.ini_detector_init(old_controller=controller,
-                               new_controller=PhotonCounter(host=self.settings['ip_address'],
+                               new_controller=PhotonScanner(host=self.settings['ip_address'],
                                                             port=self.settings['counting','port_count']))
         bname = self.controller.name
         self.settings.child('bname').setValue(bname)
 
         self.controller.reset()
+        self.controller.set_trig_enable(False)
         self.controller.set_threshold(self.settings['counting', 'threshold'])
         self.controller.set_deadtime(self.settings['counting', 'deadtime'])
         gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)

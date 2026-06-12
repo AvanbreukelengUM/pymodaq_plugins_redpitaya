@@ -119,6 +119,7 @@ class PhotonScanner:
     def get_status(self) -> dict:
         """Get full status dictionary."""
         resp = self._send("GET_STATUS")
+        print(resp)
         result = {}
         for pair in resp.split():
             k, v = pair.split("=")
@@ -274,6 +275,7 @@ class PhotonScanner:
     def get_trig_status(self) -> TrigStatus:
         """Get triggered mode status (trig_active, trig_done)."""
         resp = self._send("GET_TRIG_STATUS")
+        print(resp)
         parts = resp.split()
         return TrigStatus(
             trig_active=bool(int(parts[0].split("=")[1])),
@@ -283,6 +285,7 @@ class PhotonScanner:
     def get_trig_counts(self) -> List[int]:
         """Get counts for all gates as a list."""
         resp = self._send("GET_TRIG_COUNTS")
+        print(resp)
         return [int(x) for x in resp.split()]
 
     def get_trig_count(self, index: int) -> int:
@@ -294,6 +297,7 @@ class PhotonScanner:
     def get_trig_config(self) -> dict:
         """Get current triggered mode configuration."""
         resp = self._send("GET_TRIG_CONFIG")
+        print(resp)
         result = {}
         for pair in resp.split():
             k, v = pair.split("=")
