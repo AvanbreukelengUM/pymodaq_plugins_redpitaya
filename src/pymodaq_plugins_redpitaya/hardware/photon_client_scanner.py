@@ -25,6 +25,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 
+
 # @dataclass
 # class CountRate:
 #     raw_counts: int       # counts in last gate period
@@ -38,6 +39,7 @@ class TrigStatus:
 
 class PhotonScanner:
     """Client for the Red Pitaya photon counter FPGA module."""
+    MAX_TRIG_GATES = 1728
 
     def __init__(self, host: str = '169.254.121.34', port: int = 5555, timeout: float = 5.0, name="Redpitaya_PhotonScanner"):
         self.host = host
@@ -113,7 +115,7 @@ class PhotonScanner:
     def set_trig_total_gates(self, num_gates: int) -> None:
         """Set the number of gates for triggered counting (1-1024)."""
         if num_gates < 1 or num_gates > 1024:
-            raise ValueError("num_gates must be between 1 and 1024")
+            raise ValueError("num_gates must be between 1 and",MAX_TRIG_GATES)
         self._send(f"SET_TRIG_TOTAL_GATES {num_gates}")
 
     def set_pixels(self, num_gates: int):
@@ -145,14 +147,14 @@ class PhotonScanner:
 
     def get_trig_count(self, index: int) -> int:
         """Get count for a specific gate."""
-        if index < 0 or index >= 1024:
-            raise ValueError("index must be between 0 and 1023")
+        if index < 0 or index >= MAX_TRIG_GATES:
+            raise ValueError("index must be between 0 and ",MAX_TRIG_GATES)
         return int(self._send(f"GET_TRIG_COUNT {index}"))
 
     def get_trig_rate(self, index: int) -> int:
         """Get count for a specific gate."""
-        if index < 0 or index >= 1024:
-            raise ValueError("index must be between 0 and 1023")
+        if index < 0 or index >= MAX_TRIG_GATES:
+            raise ValueError("index must be between 0 and,",MAX_TRIG_GATES)
         return int(self._send(f"GET_TRIG_RATE {index}"))
 
     def get_trig_config(self) -> dict:

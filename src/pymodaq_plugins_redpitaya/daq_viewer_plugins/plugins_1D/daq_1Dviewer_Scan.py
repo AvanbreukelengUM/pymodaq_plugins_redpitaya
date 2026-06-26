@@ -58,10 +58,10 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         {'title': 'Scanning:', 'name': 'scan', 'type': 'group', 'children': [
             {'title': 'Resolution (number of pixels):', 'name': 'res', 'type': 'int',
-             'value': plugin_config('scan', 'res'), 'limits': (1, 1024)},
+             'value': plugin_config('scan', 'res'), 'limits': (1, PhotonScanner.MAX_TRIG_GATES)},
             {'title': 'Start (μm)', 'name': 'start', 'type': 'float',
              'value': plugin_config('scan', 'start')},
-            {'title': 'Stop (μm)', 'name': 'stop', 'type': 'float',
+            {'title': 'Finish (μm)', 'name': 'finish', 'type': 'float',
              'value': plugin_config('scan', 'stop')},
             # {'title': 'Shape', 'name': 'shape', 'type': 'list',
             #  'limits': AnalogOutputFastChannel.SHAPES, 'value': plugin_config('scan', 'shape')},
@@ -109,23 +109,23 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
 
         elif param.name() == 'start':
-            self.stop = self.settings['scan', 'stop'] / self.settings['scan', 'conversion'] - 2
+            self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
             self.start = param.value() / self.settings['scan', 'conversion'] - 2
-            self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
+            self.mover.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
 
 
-        elif param.name() == 'stop':
+        elif param.name() == 'finish':
             self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
-            self.stop = param.value() / self.settings['scan', 'conversion'] - 2
-            self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
+            self.finish = param.value() / self.settings['scan', 'conversion'] - 2
+            self.mover.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
 
 
         elif param.name() == 'conversion':
             self.start = self.settings['scan', 'start'] / param.value() - 2
-            self.stop = self.settings['scan', 'stop'] / param.value() - 2
-            self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
+            self.finish = self.settings['scan', 'finish'] / param.value() - 2
+            self.mover.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
             self.mover.analog_out[1].burst_initial_voltage = self.start
-            self.mover.analog_out[1].burst_last_voltage = self.stop
+            self.mover.analog_out[1].burst_last_voltage = self.finish
 
     @property
     def aout(self):
@@ -151,7 +151,12 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.ini_detector_init(old_controller=controller,
                                new_controller=PhotonScanner(host=self.settings['ip_address'],
                                                             port=self.settings['counting', 'port_count']))
-        self.mover = RedPitayaScpi(ip_address=self.settings['ip_address'], port=self.settings['port'])
+        if self.is_master:  # is needed when controller is master
+            self.mover = RedPitayaScpi(ip_address=self.settings['ip_address'], port=self.settings['port']) #  arguments for instantiation!)
+            # self.controller = RedPitayaScpi(ip_address=plugin_config('ip_address')) #  arguments for instantiation!)
+        else:
+            self.mover = controller
+
         bname = self.controller.name
         self.settings.child('bname').setValue(bname)
 
@@ -166,8 +171,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         # self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
         self.mover.analog_out[1].burst_mode = "BURST"
         self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
-        self.stop = self.settings['scan', 'stop'] / self.settings['scan', 'conversion'] - 2
-        x = np.linspace(self.start, self.stop, 16384)
+        self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
+        x = np.linspace(self.start, self.finish, 16384)
         waveform = []
         for n in x:
             waveform.append(f"{n:.5f}")
@@ -176,7 +181,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.mover.analog_out[1].frequency = 1000 / self.settings['scan', 'res'] / self.settings['counting', 'gate_ms']
         self.mover.analog_out[1].offset = 0
         self.mover.analog_out[1].burst_initial_voltage = self.start
-        self.mover.analog_out[1].burst_last_voltage = self.stop
+        self.mover.analog_out[1].burst_last_voltage = self.finish
         self.mover.analog_out[1].burst_num_cycles = 1
         self.mover.analog_out[1].burst_num_repetitions = 1
         self.mover.analog_out[1].enable = True
@@ -212,7 +217,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             others optionals arguments
         """
         self.mover.analog_out[1].burst_initial_voltage = self.start
-        self.mover.analog_out[1].burst_last_voltage = self.stop
+        self.mover.analog_out[1].burst_last_voltage = self.finish
 
         self.mover.analog_out[1].run()
 
@@ -238,7 +243,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        self.controller.disable()
+        # self.controller.disable()
         return ''
 
 
