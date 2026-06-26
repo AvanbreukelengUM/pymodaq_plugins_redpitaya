@@ -158,6 +158,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
 
             self.settings.child('bounds', 'is_bounds').value()
             self.settings.child('bounds', 'is_bounds').setValue(True)
+
         elif param.name() == 'enable':
             self.aout.enable = param.value()
         elif param.name() == 'shape':
@@ -216,6 +217,17 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
 
         self.aout.shape = self.settings['shape'] #plugin_config('generator', 'shape')
 
+        if self.axis_name == 'frequency':
+            self.settings.child('bounds', 'min_bound').setValue(1e-6)
+            self.settings.child('bounds', 'max_bound').setValue(50e6)
+        elif self.axis_name == 'amplitude':
+            self.settings.child('bounds', 'min_bound').setValue(0)
+            self.settings.child('bounds', 'max_bound').setValue(2)
+        elif self.axis_name == 'displacement':
+            self.settings.child('bounds', 'min_bound').setValue(-200e-6)
+            self.settings.child('bounds', 'max_bound').setValue(200e-6)
+        self.settings.child('bounds', 'is_bounds').value()
+        self.settings.child('bounds', 'is_bounds').setValue(True)
         self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
         self.aout.enable = True
