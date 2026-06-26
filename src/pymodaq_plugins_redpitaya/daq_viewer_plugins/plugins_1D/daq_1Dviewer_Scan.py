@@ -58,7 +58,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         {'title': 'Scanning:', 'name': 'scan', 'type': 'group', 'children': [
             {'title': 'Resolution (number of pixels):', 'name': 'res', 'type': 'int',
-             'value': plugin_config('scan', 'res')},
+             'value': plugin_config('scan', 'res'), 'limits': (1, 1024)},
             {'title': 'Start (μm)', 'name': 'start', 'type': 'float',
              'value': plugin_config('scan', 'start')},
             {'title': 'Stop (μm)', 'name': 'stop', 'type': 'float',
@@ -95,7 +95,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             gate_cycles = int(param.value() * 125_000)
             self.controller.set_gate_period(gate_cycles)
             print(f"  Gate period: {param.value()} ms ({gate_cycles} cycles)")
-            if 1 / param.value() * 1000 > self.gated_counts[0]:
+            if 1 / param.value() * 1000 > self.gated_rates[0]:
                 print("WARNING: Gate period might be too short for the current count rate.")
             if param.value() * self.settings['scan', 'res'] < 10:
                 print("Attention: Gate period is lower than the PyMoDAQ update time.")
@@ -109,21 +109,23 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
 
         elif param.name() == 'start':
-            stop = self.settings['scan', 'stop'] / self.settings['scan', 'conversion'] - 2
-            start = param.value() / self.settings['scan', 'conversion'] - 2
+            self.stop = self.settings['scan', 'stop'] / self.settings['scan', 'conversion'] - 2
+            self.start = param.value() / self.settings['scan', 'conversion'] - 2
             self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
 
 
         elif param.name() == 'stop':
-            start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
-            stop = param.value() / self.settings['scan', 'conversion'] - 2
+            self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
+            self.stop = param.value() / self.settings['scan', 'conversion'] - 2
             self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
 
 
         elif param.name() == 'conversion':
-            start = self.settings['scan', 'start'] / param.value() - 2
-            stop = self.settings['scan', 'stop'] / param.value() - 2
+            self.start = self.settings['scan', 'start'] / param.value() - 2
+            self.stop = self.settings['scan', 'stop'] / param.value() - 2
             self.mover.analog_out[1].waveform_data = np.linspace(start, stop, 16384)
+            self.mover.analog_out[1].burst_initial_voltage = self.start
+            self.mover.analog_out[1].burst_last_voltage = self.stop
 
     @property
     def aout(self):
@@ -156,7 +158,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.controller.reset()
         self.controller.set_threshold(self.settings['counting', 'threshold'])
         self.controller.set_deadtime(self.settings['counting', 'deadtime'])
-        gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000_000)
+        gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
         self.controller.set_gate_period(gate_cycles)
 
         self.mover.output_reset()
@@ -181,9 +183,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         self.controller.enable()
         self.controller.set_pixels(self.settings['scan', 'res'])
-        self.gated_counts = np.zeros(self.settings['scan', 'res'])
-        self.controller.set_trig_enable(True)
-        self.controller.set_trig_arm(True)
+        self.gated_rates = np.zeros(self.settings['scan', 'res'])
+        self.controller.trig_soft(False)
         # self.controller.start_stream_trig(int(self.settings['counting', 'gate_ms'] * self.settings['scan', 'res']))
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
@@ -192,11 +193,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
     def close(self):
         """Terminate the communication protocol"""
-        self.controller.set_trig_arm(False)
-        self.controller.set_trig_enable(False)
         self.controller.disable()
-        self.controller.stop_stream()
-        self.controller.disable()
+        self.controller.trig_soft(False)
         self.controller.close()
         self.mover.output_reset()
         self.mover.analog_out[1].enable = False
@@ -215,39 +213,32 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         """
         self.mover.analog_out[1].burst_initial_voltage = self.start
         self.mover.analog_out[1].burst_last_voltage = self.stop
-        self.controller.set_trig_enable(True)
-        self.controller.set_trig_arm(True)
-        # self.mover.analog_out[1].run()
-        QThread.msleep(max((5000, int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))))
 
         self.mover.analog_out[1].run()
-        # points = self.controller.read_stream_trig()
-        QThread.msleep(max((5000, int(self.settings['counting', 'gate_ms']*self.settings['scan', 'res']))))
-        points = None
-        # print(points)
-        print(self.controller.get_trig_status())
-        print(self.controller.get_status())
-        print(self.controller.get_trig_counts())
-        # print(self.controller.get_trig_count(1))
+
+        while True:
+            status = self.controller.get_trig_status()
+            if status.trig_done:
+                break
+        points = self.controller.get_trig_rates()
         if points:
-            ts, self.gated_counts = points
-            self.controller.set_trig_arm(False)
+            self.gated_rates = np.array(points)
         else:
             print("No data. Re-trying...")
 
         scaling = self.settings['counting', 'gate_ms'] / 1000
         axis = Axis('time', units='s', offset=0,
                     scaling=scaling,
-                    size=np.size(self.gated_counts))
+                    size=np.size(self.gated_rates))
 
-        self.dte_signal.emit(DataToExport('PhotonCounter',
-                                          data=[DataFromPlugins(name='RedPitaya', data=[self.gated_counts],
-                                                                dim='Data1D', labels=['IN1'],
+        self.dte_signal.emit(DataToExport('PhotonScanner',
+                                          data=[DataFromPlugins(name='RedPitaya', data=[self.gated_rates],
+                                                                dim='Data1D', labels=['IN1'], units='cps',
                                                                 axes=[axis])]))
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        # self.controller.stop_stream()
+        self.controller.disable()
         return ''
 
 
