@@ -39,7 +39,7 @@ class TrigStatus:
 
 class PhotonScanner:
     """Client for the Red Pitaya photon counter FPGA module."""
-    MAX_TRIG_GATES = 1728
+    MAX_TRIG_GATES = 4095
 
     def __init__(self, host: str = '169.254.121.34', port: int = 5555, timeout: float = 5.0, name="Redpitaya_PhotonScanner"):
         self.host = host
