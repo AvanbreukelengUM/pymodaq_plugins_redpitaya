@@ -112,13 +112,14 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         self.settings.child('bname').setValue(bname)
 
         self.controller.reset()
+        self.controller.stop_stream()
+        self.controller.set_trig_enable(False)
         self.controller.set_threshold(self.settings['counting', 'threshold'])
         self.controller.set_deadtime(self.settings['counting', 'deadtime'])
         gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
         self.controller.set_gate_period(gate_cycles)
-        self.controller.set_pixels(1)
-        self.controller.trig_soft(False)
         self.controller.enable()
+        # self.controller.start_stream(self.settings['counting', 'stream_ms'])
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
         initialized = True
@@ -126,6 +127,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
 
     def close(self):
         """Terminate the communication protocol"""
+        # self.controller.stop_stream()
         self.controller.disable()
         self.controller.close()
 
@@ -143,23 +145,16 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         """
 
         # print(time.perf_counter())
-        self.controller.reset()
-        self.controller.trig_soft(True)
-        while True:
-            status = self.controller.get_trig_status()
-            if status.trig_done:
-                break
-        point = self.controller.get_trig_rates()
+
+        point = self.controller.get_rate()
         if point:
-            self.cps = point
-            print(self.cps)
+            self.cps = point.cps
         else:
             print("No data. Re-trying...")
-        self.controller.trig_soft(False)
 
         self.dte_signal.emit(DataToExport('PhotonCounter',
-                                              data=[DataFromPlugins(name='RedPitaya', data=np.array(self.cps),
-                                                                dim='Data0D', labels=['IN1'], units='cps')]))
+                                              data=[DataFromPlugins(name='RedPitaya', data=np.array([self.cps]),
+                                                                dim='Data0D', labels=['IN1'])]))
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
