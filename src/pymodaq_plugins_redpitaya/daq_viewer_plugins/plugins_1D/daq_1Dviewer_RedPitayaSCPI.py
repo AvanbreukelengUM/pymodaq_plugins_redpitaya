@@ -46,9 +46,9 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
             {'title': 'Window Length:', 'name': 'window_length', 'type': 'float',
              'value': 0, 'siPrefix': True, 'suffix': 's', 'readonly': True},
             {'title': 'Gain1 (jumper CH1):', 'name': 'gain1', 'type': 'list',
-             'limits': RedPitayaScpi.GAINS, 'value': plugin_config('sampling', 'gain1')},
+             'limits': AnalogInputFastChannel.GAINS, 'value': plugin_config('sampling', 'gain1')},
             {'title': 'Gain2 (jumper CH2):', 'name': 'gain2', 'type': 'list',
-             'limits': RedPitayaScpi.GAINS, 'value': plugin_config('sampling', 'gain2')},
+             'limits': AnalogInputFastChannel.GAINS, 'value': plugin_config('sampling', 'gain2')},
 
         ]},
         {'title': 'Triggering:', 'name': 'triggering', 'type': 'group', 'children': [
@@ -98,9 +98,11 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
             self.controller.acq_trigger_source = param.value()
 
         elif param.name() == 'gain1':
-            self.controller.acq_gain1 = param.value()
+            # self.controller.acq_gain1 = param.value()
+            self.ain(channel = 1).gain = param.value()
         elif param.name() == 'gain2':
-            self.controller.acq_gain2 = param.value()
+            # self.controller.acq_gain2 = param.value()
+            self.ain(channel = 2).gain = param.value()
 
     def _center_trigger(self):
         if self.settings['triggering', 'center_trigger']:
@@ -114,6 +116,10 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
     def update_window_length(self):
         self.settings.child('sampling', 'window_length').setValue(
             self.settings['sampling', 'nsamples'] / self.settings['sampling', 'sample_rate'])
+
+    def ain(self,channel = 1):
+        """ It defines what output channel the user chose"""
+        return self.controller.analog_in[channel]
 
     def ini_detector(self, controller=None):
         """Detector communication initialization
@@ -141,8 +147,11 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
         self.controller.acq_format = 'ASCII'
         self.controller.acq_units = 'VOLTS'
 
-        self.controller.acq_gain1 = self.settings['sampling', 'gain1']
-        self.controller.acq_gain2 = self.settings['sampling', 'gain2']
+        self.ain(channel=1).gain = self.settings['sampling', 'gain1']
+        self.ain(channel=2).gain = self.settings['sampling', 'gain2']
+
+        # self.controller.acq_gain1 = self.settings['sampling', 'gain1']
+        # self.controller.acq_gain2 = self.settings['sampling', 'gain2']
 
         self.controller.acq_trigger_level = self.settings['triggering', 'level']
 

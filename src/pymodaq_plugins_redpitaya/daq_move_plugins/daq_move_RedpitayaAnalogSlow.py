@@ -142,6 +142,13 @@ class DAQ_Move_RedpitayaAnalogSlow(DAQ_Move_base):
         else:
             self.controller = controller
 
+            if self.axis_name == 'voltage':
+                self.settings.child('bounds', 'min_bound').setValue(0)
+                self.settings.child('bounds', 'max_bound').setValue(1.8)
+            elif self.axis_name == 'displacement':
+                self.settings.child('bounds', 'min_bound').setValue(0)
+                self.settings.child('bounds', 'max_bound').setValue(30e-6)
+        self.settings.child('bounds', 'is_bounds').value()
         self.settings.child('bounds', 'is_bounds').setValue(True)
         self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
