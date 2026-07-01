@@ -150,7 +150,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
                 self.settings.child('bounds', 'min_bound').setValue(1e-6)
                 self.settings.child('bounds', 'max_bound').setValue(50e6)
             elif param.value == 'amplitude':
-                self.settings.child('bounds', 'min_bound').setValue(0)
+                self.settings.child('bounds', 'min_bound').setValue(-2)
                 self.settings.child('bounds', 'max_bound').setValue(2)
             elif param.value == 'displacement':
                 self.settings.child('bounds', 'min_bound').setValue(-200e-6)
@@ -228,7 +228,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             self.settings.child('bounds', 'max_bound').setValue(200e-6)
         self.settings.child('bounds', 'is_bounds').value()
         self.settings.child('bounds', 'is_bounds').setValue(True)
-        self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
+        # self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
         self.aout.enable = True
         self.aout.run() # TODO change this function to work with other trigger sources than INTernal trigger
