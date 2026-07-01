@@ -1,7 +1,7 @@
 title = "this is the configuration file of the redpitaya plugin !!!!!!"
 ip_address = "169.254.121.34"
 port = 5000
-gen_type= "RF fast"
+gen_type = "RF fast"
 
 [sampling]
 decimation = 128
@@ -24,16 +24,8 @@ offset = 0
 phase = 0
 cycle = 0.5
 channel = 1
-scaling = 50e-6
-
-[generator_slow]
-scaling = 16.66e-6
-chanel = 1
-
-[Scaling]
-scaling = 50e-6
-use_scaling = true
-offset2 = 0
+piezo_channel = "x"
+scaling = 5e-5
 
 [sweep]
 sweep_modes = "LINEAR"
@@ -44,13 +36,50 @@ sweep_decimation = 64
 sweep_nsamples = 8000
 direction = "NORMAL"
 
-[counting]
-port_count = 5555
-port_count_1D = 5556
-threshold = 200 #200 is a good value for signals of +-1V
+[Scaling]
+scaling = 25
+use_scaling = true
+offset2 = 0
+
+[Counting]
+port_count1D = 5555
+threshold = 100
 deadtime = 0
 gate_ms = 10
 history = 1000
+window_s = 30
+stream_ms = 100
+histogram = false
+
+[counting]
+port_count = 5555
+threshold = 200
+deadtime = 0
+gate_ms = 10
+history = 1000
+window_s = 30
 stream_length = 5
 stream_ms = 20
 histogram = false
+port_count_1D = 5555
+
+[scan]
+port_scan = 5555
+start = 0
+stop = 100
+res = 100
+shape = "ARBITRARY"
+
+[generator_slow]
+gen_trigger = "INT"
+enabling = false
+amplitude = 1
+frequency = 1000
+shape = "DC"
+offset = 0
+phase = 0
+cycle = 0.5
+channel = 1
+piezo_channel = "x"
+scaling = 1.666e-5
+chanel = 1
