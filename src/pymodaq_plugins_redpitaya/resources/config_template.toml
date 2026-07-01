@@ -1,4 +1,4 @@
-title = "this is the configuration file of the redpitaya plugin !!!!!!"
+title = "this is the configuration file of the redpitaya plugin"
 ip_address = "169.254.121.34"
 port = 5000
 gen_type = "RF fast"
@@ -41,27 +41,10 @@ scaling = 25
 use_scaling = true
 offset2 = 0
 
-[Counting]
-port_count1D = 5555
-threshold = 100
-deadtime = 0
-gate_ms = 10
-history = 1000
-window_s = 30
-stream_ms = 100
-histogram = false
-
 [counting]
-port_count = 5555
 threshold = 200
 deadtime = 0
 gate_ms = 10
-history = 1000
-window_s = 30
-stream_length = 5
-stream_ms = 20
-histogram = false
-port_count_1D = 5555
 
 [scan]
 port_scan = 5555

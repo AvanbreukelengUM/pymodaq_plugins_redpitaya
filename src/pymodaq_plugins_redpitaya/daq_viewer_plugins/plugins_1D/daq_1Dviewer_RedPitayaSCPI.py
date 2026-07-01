@@ -46,9 +46,9 @@ class DAQ_1DViewer_RedPitayaSCPI(DAQ_Viewer_base):
             {'title': 'Window Length:', 'name': 'window_length', 'type': 'float',
              'value': 0, 'siPrefix': True, 'suffix': 's', 'readonly': True},
             {'title': 'Gain1 (jumper CH1):', 'name': 'gain1', 'type': 'list',
-             'limits': AnalogInputFastChannel.GAINS, 'value': plugin_config('sampling', 'gain1')},
+             'limits': RedPitayaScpi.GAINS, 'value': plugin_config('sampling', 'gain1')},
             {'title': 'Gain2 (jumper CH2):', 'name': 'gain2', 'type': 'list',
-             'limits': AnalogInputFastChannel.GAINS, 'value': plugin_config('sampling', 'gain2')},
+             'limits': RedPitayaScpi.GAINS, 'value': plugin_config('sampling', 'gain2')},
 
         ]},
         {'title': 'Triggering:', 'name': 'triggering', 'type': 'group', 'children': [
