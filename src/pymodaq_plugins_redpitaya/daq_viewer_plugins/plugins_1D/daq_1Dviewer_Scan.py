@@ -219,18 +219,19 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
-        self.controller.analog_out[1].burst_initial_voltage = self.start
-        self.controller.analog_out[1].burst_last_voltage = self.finish
-
+        self.detector.enable()
         self.controller.analog_out[1].run()
-
+        QThread.msleep(self.settings['counting', 'gate_ms'])
         while True:
             status = self.detector.get_trig_status()
             if status.trig_done:
+                self.detector.disable()
                 break
-        points = self.detector.get_trig_rates()
+        points = self.detector.get_trig_rates_debug()
+
         if points:
             self.gated_rates = np.array(points)
+            print(self.gated_rates)
         else:
             print("No data. Re-trying...")
 
@@ -243,6 +244,9 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                                           data=[DataFromPlugins(name='RedPitaya', data=[self.gated_rates],
                                                                 dim='Data1D', labels=['IN1'], units='cps',
                                                                 axes=[axis])]))
+
+        # self.controller.analog_out[1].burst_initial_voltage = self.start
+        # self.controller.analog_out[1].burst_last_voltage = self.finish
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
