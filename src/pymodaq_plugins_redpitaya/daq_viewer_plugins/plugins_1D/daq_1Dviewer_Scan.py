@@ -1,3 +1,4 @@
+from pymodaq.scripting import Detector
 from qtpy.QtCore import QThread
 
 from pymodaq.utils.data import DataFromPlugins, Axis, DataToExport
@@ -71,8 +72,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
     ]
 
     def ini_attributes(self):
-        self.controller: PhotonScanner = None
-        self.mover: RedPitayaScpi = None
+        self.detector: PhotonScanner = None
+        self.controller: RedPitayaScpi = None
         self.x_axis: Axis = None
 
     def commit_settings(self, param: Parameter):
@@ -84,53 +85,53 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             A given parameter (within detector_settings) whose value has been changed by the user
         """
         if param.name() == 'threshold':
-            self.controller.set_threshold(param.value())
+            self.detector.set_threshold(param.value())
             print(f"  Threshold: {param.value()} ADC units")
 
         elif param.name() == 'deadtime':
-            self.controller.set_deadtime(param.value())
+            self.detector.set_deadtime(param.value())
             print(f"  Dead time: {param.value()} cycles ({param.value() * 8} ns)")
 
         elif param.name() == 'gate_ms':
             gate_cycles = int(param.value() * 125_000)
-            self.controller.set_gate_period(gate_cycles)
+            self.detector.set_gate_period(gate_cycles)
             print(f"  Gate period: {param.value()} ms ({gate_cycles} cycles)")
             if 1 / param.value() * 1000 > self.gated_rates[0]:
                 print("WARNING: Gate period might be too short for the current count rate.")
             if param.value() * self.settings['scan', 'res'] < 10:
                 print("Attention: Gate period is lower than the PyMoDAQ update time.")
-            self.mover.analog_out[1].frequency = 1000 / param.value() / self.settings['scan', 'res']
+            self.controller.analog_out[1].frequency = 1000 / param.value() / self.settings['scan', 'res']
 
 
         elif param.name() == 'res':
-            self.controller.set_pixels(param.value())
-            self.mover.analog_out[1].frequency = 1000 / param.value() / self.settings[
+            self.detector.set_pixels(param.value())
+            self.controller.analog_out[1].frequency = 1000 / param.value() / self.settings[
                 'counting', 'gate_ms']
 
 
         elif param.name() == 'start':
             self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
             self.start = param.value() / self.settings['scan', 'conversion'] - 2
-            self.mover.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
+            self.controller.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
 
 
         elif param.name() == 'finish':
             self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
             self.finish = param.value() / self.settings['scan', 'conversion'] - 2
-            self.mover.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
+            self.controller.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
 
 
         elif param.name() == 'conversion':
             self.start = self.settings['scan', 'start'] / param.value() - 2
             self.finish = self.settings['scan', 'finish'] / param.value() - 2
-            self.mover.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
-            self.mover.analog_out[1].burst_initial_voltage = self.start
-            self.mover.analog_out[1].burst_last_voltage = self.finish
+            self.controller.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
+            self.controller.analog_out[1].burst_initial_voltage = self.start
+            self.controller.analog_out[1].burst_last_voltage = self.finish
 
     @property
     def aout(self):
         """ It defines what output channel the user chose"""
-        return self.mover.analog_out[1]
+        return self.controller.analog_out[1]
 
     def ini_detector(self, controller=None):
         """Detector communication initialization
@@ -148,28 +149,30 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             False if initialization failed otherwise True
         """
 
-        self.ini_detector_init(old_controller=controller,
-                               new_controller=PhotonScanner(host=self.settings['ip_address'],
-                                                            port=self.settings['counting', 'port_count']))
+        # self.ini_detector_init(old_controller=controller,
+        #                        new_controller=PhotonScanner(host=self.settings['ip_address'],
+        #                                                     port=self.settings['counting', 'port_count']))
         if self.is_master:  # is needed when controller is master
-            self.mover = RedPitayaScpi(ip_address=self.settings['ip_address'], port=self.settings['port']) #  arguments for instantiation!)
-            # self.controller = RedPitayaScpi(ip_address=plugin_config('ip_address')) #  arguments for instantiation!)
+            self.controller = RedPitayaScpi(ip_address=self.settings['ip_address'], port=self.settings['port']) #  arguments for instantiation!)
+            # self.detector = RedPitayaScpi(ip_address=plugin_config('ip_address')) #  arguments for instantiation!)
         else:
-            self.mover = controller
+            self.controller = controller
 
-        bname = self.controller.name
+        self.detector = PhotonScanner(host=self.settings['ip_address'],
+                                      port=self.settings['counting', 'port_count'])
+        bname = self.detector.name
         self.settings.child('bname').setValue(bname)
 
-        self.controller.reset()
-        self.controller.set_threshold(self.settings['counting', 'threshold'])
-        self.controller.set_deadtime(self.settings['counting', 'deadtime'])
+        self.detector.reset()
+        self.detector.set_threshold(self.settings['counting', 'threshold'])
+        self.detector.set_deadtime(self.settings['counting', 'deadtime'])
         gate_cycles = int(self.settings['counting', 'gate_ms'] * 125_000)
-        self.controller.set_gate_period(gate_cycles)
+        self.detector.set_gate_period(gate_cycles)
 
-        self.mover.output_reset()
-        self.mover.analog_out[1].shape = "ARBITRARY"  # plugin_config('generator', 'shape')
+        self.controller.output_reset()
+        self.controller.analog_out[1].shape = "ARBITRARY"  # plugin_config('generator', 'shape')
         # self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
-        self.mover.analog_out[1].burst_mode = "BURST"
+        self.controller.analog_out[1].burst_mode = "BURST"
         self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
         self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
         x = np.linspace(self.start, self.finish, 16384)
@@ -177,20 +180,20 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         for n in x:
             waveform.append(f"{n:.5f}")
         waveform1 = ", ".join(map(str, waveform))
-        self.mover.analog_out[1].waveform_data = waveform1
-        self.mover.analog_out[1].frequency = 1000 / self.settings['scan', 'res'] / self.settings['counting', 'gate_ms']
-        self.mover.analog_out[1].offset = 0
-        self.mover.analog_out[1].burst_initial_voltage = self.start
-        self.mover.analog_out[1].burst_last_voltage = self.finish
-        self.mover.analog_out[1].burst_num_cycles = 1
-        self.mover.analog_out[1].burst_num_repetitions = 1
-        self.mover.analog_out[1].enable = True
+        self.controller.analog_out[1].waveform_data = waveform1
+        self.controller.analog_out[1].frequency = 1000 / self.settings['scan', 'res'] / self.settings['counting', 'gate_ms']
+        self.controller.analog_out[1].offset = 0
+        self.controller.analog_out[1].burst_initial_voltage = self.start
+        self.controller.analog_out[1].burst_last_voltage = self.finish
+        self.controller.analog_out[1].burst_num_cycles = 1
+        self.controller.analog_out[1].burst_num_repetitions = 1
+        self.controller.analog_out[1].enable = True
 
-        self.controller.enable()
-        self.controller.set_pixels(self.settings['scan', 'res'])
+        self.detector.enable()
+        self.detector.set_pixels(self.settings['scan', 'res'])
         self.gated_rates = np.zeros(self.settings['scan', 'res'])
-        self.controller.trig_soft(False)
-        # self.controller.start_stream_trig(int(self.settings['counting', 'gate_ms'] * self.settings['scan', 'res']))
+        self.detector.trig_soft(False)
+        # self.detector.start_stream_trig(int(self.settings['counting', 'gate_ms'] * self.settings['scan', 'res']))
 
         info = f"Succesfully connected to the Redpitaya {bname} board"
         initialized = True
@@ -198,11 +201,11 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
     def close(self):
         """Terminate the communication protocol"""
-        self.controller.disable()
-        self.controller.trig_soft(False)
-        self.controller.close()
-        self.mover.output_reset()
-        self.mover.analog_out[1].enable = False
+        self.detector.disable()
+        self.detector.trig_soft(False)
+        self.detector.close()
+        self.controller.output_reset()
+        self.controller.analog_out[1].enable = False
 
     def grab_data(self, Naverage=1, **kwargs):
 
@@ -216,16 +219,16 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
-        self.mover.analog_out[1].burst_initial_voltage = self.start
-        self.mover.analog_out[1].burst_last_voltage = self.finish
+        self.controller.analog_out[1].burst_initial_voltage = self.start
+        self.controller.analog_out[1].burst_last_voltage = self.finish
 
-        self.mover.analog_out[1].run()
+        self.controller.analog_out[1].run()
 
         while True:
-            status = self.controller.get_trig_status()
+            status = self.detector.get_trig_status()
             if status.trig_done:
                 break
-        points = self.controller.get_trig_rates()
+        points = self.detector.get_trig_rates()
         if points:
             self.gated_rates = np.array(points)
         else:
@@ -243,9 +246,9 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
-        # self.controller.disable()
+        # self.detector.disable()
         return ''
 
 
 if __name__ == '__main__':
-    main(__file__, init=True)
+    main(__file__, init=False)

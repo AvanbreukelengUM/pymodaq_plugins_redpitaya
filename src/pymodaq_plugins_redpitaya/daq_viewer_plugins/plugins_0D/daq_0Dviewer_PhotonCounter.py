@@ -49,7 +49,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
 
         {'title': 'Counting:', 'name': 'counting', 'type': 'group', 'children': [
             {'title': 'Port:', 'name': 'port_count', 'type': 'int',
-              'value': plugin_config('counting', 'port_count')},
+              'value': plugin_config('scan', 'port_scan')},
             {'title': 'Threshold (ADC units):', 'name': 'threshold', 'type': 'int',
              'value': plugin_config('counting', 'threshold')},
             {'title': 'Deadtime (clock cycles, 1=8ns):', 'name': 'deadtime', 'type': 'int',
@@ -152,7 +152,7 @@ class DAQ_0DViewer_PhotonCounter(DAQ_Viewer_base):
         point = self.controller.get_trig_rates()
         if point:
             self.cps = point
-            print(self.cps)
+            # print(self.cps)
         else:
             print("No data. Re-trying...")
         self.controller.trig_soft(False)
