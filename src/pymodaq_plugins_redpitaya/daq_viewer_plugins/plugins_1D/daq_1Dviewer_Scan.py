@@ -194,6 +194,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.waveform_backforce = ", ".join(map(str, reversed(waveform)))
         self.i =0
         self.controller.analog_out[1].waveform_data = self.waveform1
+        self.controller.analog_out[1].burst_initial_voltage = self.start
+        self.controller.analog_out[1].burst_last_voltage = self.finish
         self.controller.analog_out[1].frequency = 1000 / self.settings['scan', 'res'] / self.settings['counting', 'gate_ms']
         self.controller.analog_out[1].offset = 0
 
@@ -231,23 +233,6 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
-
-        if self.i%2:
-            # For the next cycle we go left-way
-            self.controller.analog_out[1].waveform_data = self.waveform_backforce
-            self.controller.analog_out[1].burst_initial_voltage = self.finish
-            self.controller.analog_out[1].burst_last_voltage = self.start
-        else:
-            self.gated_rates = self.gated_rates[::-1]
-            # For the next cycle we go right-way
-            self.controller.analog_out[1].waveform_data = self.waveform1
-            self.controller.analog_out[1].burst_initial_voltage = self.start
-            self.controller.analog_out[1].burst_last_voltage = self.finish
-        if self.backforce:
-            self.i = self.i + 1
-            print(self.i)
-        a = self.controller.analog_out[1].waveform_data
-        print(self.controller.analog_out[1].waveform_data[0])
         self.detector.enable()
         self.controller.analog_out[1].run()
         QThread.msleep(self.settings['counting', 'gate_ms'])
@@ -261,7 +246,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         if points:
             self.gated_rates = np.array(points)
-            # print(self.gated_rates)
+            if self.i%2:
+                self.gated_rates = self.gated_rates[::-1]
         else:
             print("No data. Re-trying...")
 
@@ -275,7 +261,20 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                                           data=[DataFromPlugins(name='RedPitaya', data=[self.gated_rates],
                                                                 dim='Data1D', labels=['IN1'], units='cps',
                                                                 axes=[axis])]))
-        QThread.msleep(100)
+        if self.backforce:
+            self.i = self.i + 1
+            print(self.i)
+            if not self.i%2:
+                # For the first cycle we go from start to finish
+                self.controller.analog_out[1].waveform_data = self.waveform1
+                self.controller.analog_out[1].burst_initial_voltage = self.start
+                self.controller.analog_out[1].burst_last_voltage = self.finish
+            else:
+                # For the second cycle (if back_force chosen) we reverse start and finish
+                self.controller.analog_out[1].waveform_data = self.waveform_backforce
+                self.controller.analog_out[1].burst_initial_voltage = self.finish
+                self.controller.analog_out[1].burst_last_voltage = self.start
+            QThread.msleep(150)
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
