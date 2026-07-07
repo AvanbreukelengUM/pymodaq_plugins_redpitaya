@@ -116,13 +116,15 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
             self.start = param.value() / self.settings['scan', 'conversion'] - 2
             self.controller.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
-
+            self.controller.analog_out[1].burst_initial_voltage = self.start
+            self.controller.analog_out[1].burst_last_voltage = self.finish
 
         elif param.name() == 'finish':
             self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
             self.finish = param.value() / self.settings['scan', 'conversion'] - 2
             self.controller.analog_out[1].waveform_data = np.linspace(self.start, self.finish, 16384)
-
+            self.controller.analog_out[1].burst_initial_voltage = self.start
+            self.controller.analog_out[1].burst_last_voltage = self.finish
 
         elif param.name() == 'conversion':
             self.start = self.settings['scan', 'start'] / param.value() - 2
@@ -132,7 +134,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             self.controller.analog_out[1].burst_last_voltage = self.finish
 
         elif param.name() == 'backforce':
-            self.backforce = True
+            self.backforce = param.value()
+            # self.controller.analog_out[1].burst_use_last_sample = 'ON'
 
     @property
     def aout(self):
@@ -163,7 +166,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             # self.detector = RedPitayaScpi(ip_address=plugin_config('ip_address')) #  arguments for instantiation!)
         else:
             self.controller = controller
-
+        print("controller",self.controller)
         self.detector = PhotonScanner(host=self.settings['ip_address'],
                                       port=self.settings['counting', 'port_count'])
         bname = self.detector.name
@@ -182,6 +185,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
         self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
         self.backforce = self.settings['scan', 'backforce']
+        print("self.backforce",self.backforce)
         x = np.linspace(self.start, self.finish, 16384)
         waveform = []
         for n in x:
@@ -192,8 +196,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.controller.analog_out[1].waveform_data = self.waveform1
         self.controller.analog_out[1].frequency = 1000 / self.settings['scan', 'res'] / self.settings['counting', 'gate_ms']
         self.controller.analog_out[1].offset = 0
-        self.controller.analog_out[1].burst_initial_voltage = self.start
-        self.controller.analog_out[1].burst_last_voltage = self.finish
+
         self.controller.analog_out[1].burst_num_cycles = 1
         self.controller.analog_out[1].burst_num_repetitions = 1
         self.controller.analog_out[1].enable = True
@@ -228,6 +231,23 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         kwargs: dict
             others optionals arguments
         """
+
+        if self.i%2:
+            # For the next cycle we go left-way
+            self.controller.analog_out[1].waveform_data = self.waveform_backforce
+            self.controller.analog_out[1].burst_initial_voltage = self.finish
+            self.controller.analog_out[1].burst_last_voltage = self.start
+        else:
+            self.gated_rates = self.gated_rates[::-1]
+            # For the next cycle we go right-way
+            self.controller.analog_out[1].waveform_data = self.waveform1
+            self.controller.analog_out[1].burst_initial_voltage = self.start
+            self.controller.analog_out[1].burst_last_voltage = self.finish
+        if self.backforce:
+            self.i = self.i + 1
+            print(self.i)
+        a = self.controller.analog_out[1].waveform_data
+        print(self.controller.analog_out[1].waveform_data[0])
         self.detector.enable()
         self.controller.analog_out[1].run()
         QThread.msleep(self.settings['counting', 'gate_ms'])
@@ -241,7 +261,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
 
         if points:
             self.gated_rates = np.array(points)
-            print(self.gated_rates)
+            # print(self.gated_rates)
         else:
             print("No data. Re-trying...")
 
@@ -250,24 +270,12 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                     scaling=scaling,
                     size=np.size(self.gated_rates))
 
-        if self.backforce:
-            self.i = self.i + 1
-        if self.i%2:
-            # For the next cycle we go left-way
-            self.controller.analog_out[1].waveform_data = self.waveform_backforce
-            self.controller.analog_out[1].burst_initial_voltage = self.finish
-            self.controller.analog_out[1].burst_last_voltage = self.start
-        else:
-            self.gated_rates = reversed(self.gated_rates)
-            # For the next cycle we go right-way
-            self.controller.analog_out[1].waveform_data = self.waveform1
-            self.controller.analog_out[1].burst_initial_voltage = self.start
-            self.controller.analog_out[1].burst_last_voltage = self.finish
 
         self.dte_signal.emit(DataToExport('PhotonScanner',
                                           data=[DataFromPlugins(name='RedPitaya', data=[self.gated_rates],
                                                                 dim='Data1D', labels=['IN1'], units='cps',
                                                                 axes=[axis])]))
+        QThread.msleep(100)
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
