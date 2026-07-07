@@ -261,9 +261,10 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                                           data=[DataFromPlugins(name='RedPitaya', data=[self.gated_rates],
                                                                 dim='Data1D', labels=['IN1'], units='cps',
                                                                 axes=[axis])]))
+
         if self.backforce:
             self.i = self.i + 1
-            print(self.i)
+            # print(self.i)
             if not self.i%2:
                 # For the first cycle we go from start to finish
                 self.controller.analog_out[1].waveform_data = self.waveform1
@@ -275,6 +276,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                 self.controller.analog_out[1].burst_initial_voltage = self.finish
                 self.controller.analog_out[1].burst_last_voltage = self.start
             QThread.msleep(150)
+
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
