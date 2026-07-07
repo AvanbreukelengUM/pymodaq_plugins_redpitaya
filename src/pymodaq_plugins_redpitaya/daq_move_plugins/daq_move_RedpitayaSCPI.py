@@ -221,7 +221,7 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             self.settings.child('bounds', 'min_bound').setValue(1e-6)
             self.settings.child('bounds', 'max_bound').setValue(50e6)
         elif self.axis_name == 'amplitude':
-            self.settings.child('bounds', 'min_bound').setValue(0)
+            self.settings.child('bounds', 'min_bound').setValue(-2)
             self.settings.child('bounds', 'max_bound').setValue(2)
         elif self.axis_name == 'displacement':
             self.settings.child('bounds', 'min_bound').setValue(-200e-6)
