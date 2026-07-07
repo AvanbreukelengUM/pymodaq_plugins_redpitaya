@@ -68,6 +68,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             #  'limits': AnalogOutputFastChannel.SHAPES, 'value': plugin_config('scan', 'shape')},
             {'title': 'Conversion [μm/V]', 'name': 'conversion', 'type': 'float', 'limits': (-1e-4, 1e3),
              'value': plugin_config('Scaling', 'scaling')},
+            {'title': 'Backforce', 'name': 'backforce', 'type': 'bool',
+             'value': 'true','tip':'Choose this option if you want to alternate right with left handed scans'},
         ]},
     ]
 
@@ -75,6 +77,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.detector: PhotonScanner = None
         self.controller: RedPitayaScpi = None
         self.x_axis: Axis = None
+        self.backforce: bool = None
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
@@ -128,6 +131,9 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             self.controller.analog_out[1].burst_initial_voltage = self.start
             self.controller.analog_out[1].burst_last_voltage = self.finish
 
+        elif param.name() == 'backforce':
+            self.backforce = True
+
     @property
     def aout(self):
         """ It defines what output channel the user chose"""
@@ -175,12 +181,15 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
         self.controller.analog_out[1].burst_mode = "BURST"
         self.start = self.settings['scan', 'start'] / self.settings['scan', 'conversion'] - 2
         self.finish = self.settings['scan', 'finish'] / self.settings['scan', 'conversion'] - 2
+        self.backforce = self.settings['scan', 'backforce']
         x = np.linspace(self.start, self.finish, 16384)
         waveform = []
         for n in x:
             waveform.append(f"{n:.5f}")
-        waveform1 = ", ".join(map(str, waveform))
-        self.controller.analog_out[1].waveform_data = waveform1
+        self.waveform1 = ", ".join(map(str, waveform))
+        self.waveform_backforce = ", ".join(map(str, reversed(waveform)))
+        self.i =0
+        self.controller.analog_out[1].waveform_data = self.waveform1
         self.controller.analog_out[1].frequency = 1000 / self.settings['scan', 'res'] / self.settings['counting', 'gate_ms']
         self.controller.analog_out[1].offset = 0
         self.controller.analog_out[1].burst_initial_voltage = self.start
@@ -227,7 +236,8 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
             if status.trig_done:
                 self.detector.disable()
                 break
-        points = self.detector.get_trig_rates_debug()
+        points = self.detector.get_trig_rates()
+        # points = self.detector.get_trig_rates_debug()
 
         if points:
             self.gated_rates = np.array(points)
@@ -240,13 +250,24 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                     scaling=scaling,
                     size=np.size(self.gated_rates))
 
+        if self.backforce:
+            self.i = self.i + 1
+        if self.i%2:
+            # For the next cycle we go left-way
+            self.controller.analog_out[1].waveform_data = self.waveform_backforce
+            self.controller.analog_out[1].burst_initial_voltage = self.finish
+            self.controller.analog_out[1].burst_last_voltage = self.start
+        else:
+            self.gated_rates = reversed(self.gated_rates)
+            # For the next cycle we go right-way
+            self.controller.analog_out[1].waveform_data = self.waveform1
+            self.controller.analog_out[1].burst_initial_voltage = self.start
+            self.controller.analog_out[1].burst_last_voltage = self.finish
+
         self.dte_signal.emit(DataToExport('PhotonScanner',
                                           data=[DataFromPlugins(name='RedPitaya', data=[self.gated_rates],
                                                                 dim='Data1D', labels=['IN1'], units='cps',
                                                                 axes=[axis])]))
-
-        # self.controller.analog_out[1].burst_initial_voltage = self.start
-        # self.controller.analog_out[1].burst_last_voltage = self.finish
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""
