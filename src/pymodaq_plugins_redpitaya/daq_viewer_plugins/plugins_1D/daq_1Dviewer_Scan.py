@@ -275,7 +275,7 @@ class DAQ_1DViewer_Scan(DAQ_Viewer_base):
                 self.controller.analog_out[1].waveform_data = self.waveform_backforce
                 self.controller.analog_out[1].burst_initial_voltage = self.finish
                 self.controller.analog_out[1].burst_last_voltage = self.start
-            QThread.msleep(150)
+            # QThread.msleep(150)
 
 
     def stop(self):
