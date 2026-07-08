@@ -48,9 +48,9 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
        """
 
     is_multiaxes = True
-    _axis_names: Union[List[str], Dict[str, int]] = ['displacement', 'frequency','amplitude']
-    _controller_units: Union[str, List[str]] = ['m','Hz','V']
-    _epsilon: Union[float, List[float]] = [10e-9,1,0.005] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
+    _axis_names: Union[List[str], Dict[str, int]] = ['displacement', 'frequency','amplitude','offset']
+    _controller_units: Union[str, List[str]] = ['m','Hz','V','V']
+    _epsilon: Union[float, List[float]] = [10e-9,1,0.005,0.005] # Detailing 5mV and 1Hz. Resolution of reading is 5mV
     # _epsilon: Union[float, List[float]] = 0.1  # Detailing 1mV and 1Hz #TODO replace this by a value that is correct depending on your controller
     # TODO it could be a single float of a list of float (as much as the number of axes)
     data_actuator_type = DataActuatorType.DataActuator
@@ -60,8 +60,8 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
                  {'title': 'Port:', 'name': 'port', 'type': 'int', 'value': plugin_config('port')},
                  {'title': 'Board name:', 'name': 'bname', 'type': 'str', 'readonly': True},
 
-                 {'title': 'Conversion [nm/V]', 'name': 'conversion', 'type': 'float', 'limits': (-1e-4, 1e-4),
-                  'value': plugin_config('Scaling', 'scaling')},
+                 {'title': 'Conversion [μm/V]', 'name': 'conversion', 'type': 'float', 'limits': (-1000, 1000),
+                  'value': plugin_config('generator', 'scaling')},
 
                  # {'title': 'Scaling', 'name': 'scaling', 'type': 'group', 'children': [
                  #     {'title': 'FSM scaling [m/V]', 'name': 'scaling', 'type': 'float', 'limits': (-1e-4, 1e-4),
@@ -123,10 +123,14 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
         """
 
         if self.axis_name == 'displacement':
-            pos = DataActuator(data=getattr(self.aout, 'amplitude'),
+            # pos = DataActuator(data=getattr(self.aout, 'amplitude'),
+            #                units=self.axis_unit)
+            pos = DataActuator(data=getattr(self.aout, 'offset'),
+                           units=self.axis_unit)+DataActuator(data=2,
                            units=self.axis_unit)
             pos = self.get_position_with_scaling(pos)
             pos = pos*self.settings['conversion']
+            print('current', pos)
         else:
             pos = DataActuator(data=getattr(self.aout, self.axis_name),
                            units=self.axis_unit)
@@ -149,14 +153,17 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             if param.value() =='frequency':
                 self.settings.child('bounds', 'min_bound').setValue(1e-6)
                 self.settings.child('bounds', 'max_bound').setValue(50e6)
-            elif param.value == 'amplitude':
+            elif param.value() == 'amplitude':
+                self.settings.child('bounds', 'min_bound').setValue(0)
+                self.settings.child('bounds', 'max_bound').setValue(2)
+            elif param.value() == 'offset':
                 self.settings.child('bounds', 'min_bound').setValue(-2)
                 self.settings.child('bounds', 'max_bound').setValue(2)
-            elif param.value == 'displacement':
-                self.settings.child('bounds', 'min_bound').setValue(-200e-6)
-                self.settings.child('bounds', 'max_bound').setValue(200e-6)
+            elif param.value() == 'displacement':
+                self.settings.child('bounds', 'min_bound').setValue(0)
+                self.settings.child('bounds', 'max_bound').setValue(100e-6)
 
-            self.settings.child('bounds', 'is_bounds').value()
+            # self.settings.child('bounds', 'is_bounds').value()
             self.settings.child('bounds', 'is_bounds').setValue(True)
 
         elif param.name() == 'enable':
@@ -221,12 +228,15 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             self.settings.child('bounds', 'min_bound').setValue(1e-6)
             self.settings.child('bounds', 'max_bound').setValue(50e6)
         elif self.axis_name == 'amplitude':
+            self.settings.child('bounds', 'min_bound').setValue(0)
+            self.settings.child('bounds', 'max_bound').setValue(2)
+        elif self.axis_name == 'offset':
             self.settings.child('bounds', 'min_bound').setValue(-2)
             self.settings.child('bounds', 'max_bound').setValue(2)
         elif self.axis_name == 'displacement':
-            self.settings.child('bounds', 'min_bound').setValue(-200e-6)
-            self.settings.child('bounds', 'max_bound').setValue(200e-6)
-        self.settings.child('bounds', 'is_bounds').value()
+            self.settings.child('bounds', 'min_bound').setValue(0)
+            self.settings.child('bounds', 'max_bound').setValue(100e-6)
+        # self.settings.child('bounds', 'is_bounds').value()
         self.settings.child('bounds', 'is_bounds').setValue(True)
         # self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
@@ -248,10 +258,15 @@ class DAQ_Move_RedpitayaSCPI(DAQ_Move_base):
             self.aout.enable = True
         value = self.check_bound(value)  #if user checked bounds, the defined bounds are applied here
         self.target_value = value
+        print('target_value',value)
         value = self.set_position_with_scaling(value)  # TODO apply scaling if the user specified one
         if self.axis_name == 'displacement':
-            value = value/self.settings['conversion']
-            setattr(self.aout, 'amplitude', value.value(self.axis_unit))
+            value = value/self.settings['conversion']-DataActuator(data=2,
+                           units=self.axis_unit)
+            print('set_value',value)
+            # setattr(self.aout, 'amplitude', value.value(self.axis_unit))
+            setattr(self.aout, 'amplitude', 0)
+            setattr(self.aout, 'offset', value.value(self.axis_unit))
         else:
             setattr(self.aout, self.axis_name, value.value(self.axis_unit))
         self.aout.run() # regenerates trigger, otherwise it will continue to generate on the passed settings

@@ -25,7 +25,7 @@ phase = 0
 cycle = 0.5
 channel = 1
 piezo_channel = "x"
-scaling = 5e-5
+scaling = 25e-6
 
 [sweep]
 sweep_modes = "LINEAR"
