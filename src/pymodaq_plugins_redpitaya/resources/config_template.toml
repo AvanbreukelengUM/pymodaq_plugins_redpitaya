@@ -1,5 +1,6 @@
 title = "this is the configuration file of the redpitaya plugin"
-ip_address = "169.254.121.34"
+#ip_address = "169.254.121.34"
+ip_address = "192.168.1.194"
 port = 5000
 gen_type = "RF fast"
 
