@@ -12,15 +12,15 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       DISPLAY: ':99.0'
       QT_DEBUG_PLUGINS: 1
     steps:
       - name: Set up Python ${{ inputs.python }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
       - name: Install dependencies
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ inputs.python }}
       - name: Install package
@@ -31,7 +31,7 @@ jobs:
           pip install flake8 pytest pytest-cov pytest-qt pytest-xdist pytest-xvfb setuptools wheel numpy h5py ${{ inputs.qt5 }} toml
           pip install pymodaq
           pip install -e . 
-          
+
       - name: create local pymodaq folder and setting permissions
         run: |
           sudo mkdir /etc/.pymodaq
