@@ -81,7 +81,11 @@ class DAQ_Move_RedpitayaAnalogSlow(DAQ_Move_base):
         -------
         float: The position obtained after scaling conversion.
         """
-        return  self.target_value
+
+        pos = DataActuator(data=getattr(self.aout_slow, self.axis_name),
+                           units=self.axis_unit)
+        pos = self.get_position_with_scaling(pos)
+        return pos
 
 
     def close(self):
@@ -141,7 +145,7 @@ class DAQ_Move_RedpitayaAnalogSlow(DAQ_Move_base):
                 self.settings.child('bounds', 'max_bound').setValue(1.8)
         self.settings.child('bounds', 'is_bounds').value()
         self.settings.child('bounds', 'is_bounds').setValue(True)
-        self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
+        # self.settings.child('bounds', 'is_bounds').setOpts(readonly=True)
 
 
         info = "Whatever info you want to log"
